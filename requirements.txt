@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+apify-client
+openai
+python-dotenv
+pydantic
+httpx

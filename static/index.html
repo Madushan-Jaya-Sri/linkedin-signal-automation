@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkedIn Lead Intelligence</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f5f6fa;
+    color: #2d3436;
+    min-height: 100vh;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+  /* Header */
+  header { text-align: center; padding: 48px 0 36px; }
+  header h1 { font-size: 1.75rem; font-weight: 700; color: #1a1a2e; letter-spacing: -0.5px; }
+  header p { color: #636e72; font-size: 0.95rem; margin-top: 6px; }
+
+  /* Search Form */
+  .search-form {
+    background: #fff;
+    border: 1px solid #e0e3ea;
+    border-radius: 14px;
+    padding: 24px 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 120px auto;
+    gap: 16px;
+    align-items: end;
+    margin-bottom: 28px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 0.7rem; color: #636e72; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+  .field input {
+    background: #f8f9fc; border: 1px solid #e0e3ea; border-radius: 8px;
+    padding: 10px 14px; color: #2d3436; font-size: 0.9rem; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .field input:focus { border-color: #4f6af6; box-shadow: 0 0 0 3px rgba(79,106,246,0.1); }
+  .field input::placeholder { color: #b2bec3; }
+
+  .btn-primary {
+    background: #4f6af6; color: #fff; border: none; border-radius: 8px;
+    padding: 10px 24px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s; white-space: nowrap; height: 42px;
+  }
+  .btn-primary:hover { background: #3d56d4; }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { background: #b2bec3; cursor: not-allowed; }
+
+  /* Pipeline Steps */
+  .pipeline { display: none; margin-bottom: 28px; }
+  .pipeline.visible { display: block; }
+  .pipeline-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+  .pipeline-step { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #b2bec3; font-weight: 500; transition: color 0.3s; }
+  .pipeline-step.active { color: #4f6af6; }
+  .pipeline-step.done { color: #00b894; }
+  .step-dot {
+    width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem; font-weight: 700; background: #edf0f5; color: #b2bec3; transition: all 0.3s;
+  }
+  .pipeline-step.active .step-dot { background: #4f6af6; color: #fff; animation: pulse 1.5s infinite; }
+  .pipeline-step.done .step-dot { background: #00b894; color: #fff; }
+  .step-line { width: 40px; height: 2px; background: #edf0f5; transition: background 0.3s; }
+  .step-line.done { background: #00b894; }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(79,106,246,0.3); }
+    50% { box-shadow: 0 0 0 6px rgba(79,106,246,0); }
+  }
+
+  /* Status message with rotating text */
+  .status-area {
+    background: #fff; border: 1px solid #e0e3ea; border-radius: 12px;
+    padding: 20px 24px; margin-bottom: 20px; display: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04); text-align: center;
+  }
+  .status-area.visible { display: block; }
+  .status-main { font-size: 0.95rem; color: #2d3436; font-weight: 600; margin-bottom: 8px; }
+  .status-sub {
+    font-size: 0.8rem; color: #636e72; min-height: 20px;
+    transition: opacity 0.3s;
+  }
+  .status-sub.fade { opacity: 0; }
+  .status-dots { display: inline-block; width: 24px; text-align: left; }
+
+  /* Scoring Stage */
+  .scoring-stage {
+    display: none; margin-bottom: 24px;
+  }
+  .scoring-stage.visible { display: block; }
+
+  .scoring-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px;
+  }
+  .scoring-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: #636e72; }
+  .scoring-counter {
+    background: #f0f4ff; color: #4f6af6; padding: 4px 14px; border-radius: 20px;
+    font-size: 0.8rem; font-weight: 700;
+  }
+
+  /* The slide-through card */
+  .scoring-track {
+    background: #fff; border: 1px solid #e0e3ea; border-radius: 14px;
+    padding: 28px 32px; min-height: 90px; position: relative; overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .slide-card {
+    display: flex; align-items: center; gap: 20px; width: 100%;
+    position: absolute; left: 0; right: 0; padding: 0 32px;
+  }
+
+  .slide-card.enter {
+    animation: slideIn 0.6s ease forwards;
+  }
+  .slide-card.scoring-active {
+    animation: none; opacity: 1; transform: translateX(0);
+  }
+  .slide-card.exit {
+    animation: slideOut 0.6s ease forwards;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-80%); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes slideOut {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(80%); }
+  }
+
+  .slide-avatar {
+    width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .slide-info { flex: 1; min-width: 0; }
+  .slide-name { font-size: 1rem; font-weight: 700; color: #1a1a2e; }
+  .slide-detail { font-size: 0.8rem; color: #636e72; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .slide-score-area {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 60px;
+  }
+  .slide-score {
+    font-size: 1.8rem; font-weight: 800; transition: color 0.3s;
+  }
+  .slide-score.pending { color: #dfe6e9; }
+  .slide-score.warm { color: #00b894; }
+  .slide-score.cold { color: #b2bec3; }
+  .slide-label {
+    font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 2px 8px; border-radius: 4px;
+  }
+  .slide-label.scoring { background: #f0f4ff; color: #4f6af6; }
+  .slide-label.warm { background: #e8f8f0; color: #00b894; }
+  .slide-label.cold { background: #f0f2f5; color: #b2bec3; }
+
+  .slide-spinner {
+    width: 36px; height: 36px; border: 3px solid #edf0f5; border-top-color: #4f6af6;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Funnel */
+  .funnel {
+    display: none; margin-bottom: 28px;
+  }
+  .funnel.visible { display: block; }
+
+  .funnel-row {
+    display: flex; gap: 16px; margin-bottom: 0;
+  }
+
+  .funnel-card {
+    flex: 1; background: #fff; border: 1px solid #e0e3ea; border-radius: 14px;
+    padding: 24px 20px; text-align: center; position: relative; overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: box-shadow 0.2s, transform 0.2s;
+  }
+  .funnel-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-2px); }
+
+  .funnel-icon {
+    width: 48px; height: 48px; border-radius: 12px; margin: 0 auto 14px;
+    display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
+  }
+  .funnel-icon.profiles { background: #f0f4ff; }
+  .funnel-icon.emails { background: #fef9e7; }
+  .funnel-icon.warm { background: #e8f8f0; }
+
+  .funnel-num { font-size: 2.2rem; font-weight: 800; color: #1a1a2e; line-height: 1; }
+  .funnel-label { font-size: 0.7rem; color: #636e72; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 6px; font-weight: 600; }
+
+  .funnel-bar {
+    height: 4px; border-radius: 2px; margin: 14px 0; background: #edf0f5; overflow: hidden;
+  }
+  .funnel-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+  .funnel-fill.profiles { background: #4f6af6; }
+  .funnel-fill.emails { background: #f39c12; }
+  .funnel-fill.warm { background: #00b894; }
+
+  .funnel-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: none; border: 1px solid #e0e3ea; border-radius: 8px;
+    padding: 7px 16px; font-size: 0.75rem; font-weight: 600; color: #636e72;
+    cursor: pointer; transition: all 0.2s; margin-top: 4px;
+  }
+  .funnel-btn:hover { border-color: #4f6af6; color: #4f6af6; background: #f0f4ff; }
+  .funnel-btn svg { width: 14px; height: 14px; }
+
+  .funnel-arrow {
+    display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #dfe6e9;
+    flex-shrink: 0; align-self: center; margin-top: -30px;
+  }
+
+  /* Error */
+  .error-msg {
+    background: #fef5f5; border: 1px solid #f5c6cb; border-radius: 10px;
+    padding: 14px 20px; color: #d63031; display: none; margin-bottom: 16px; font-size: 0.85rem;
+  }
+  .error-msg.visible { display: block; }
+
+  /* Tabs */
+  .tabs-bar {
+    display: none; margin-bottom: 20px;
+    background: #fff; border: 1px solid #e0e3ea; border-radius: 12px;
+    padding: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .tabs-bar.visible { display: flex; }
+
+  .tab-btn {
+    flex: 1; padding: 10px 16px; border: none; background: none;
+    border-radius: 8px; font-size: 0.8rem; font-weight: 600; color: #636e72;
+    cursor: pointer; transition: all 0.2s; display: flex; align-items: center;
+    justify-content: center; gap: 8px;
+  }
+  .tab-btn:hover { background: #f8f9fc; }
+  .tab-btn.active { background: #4f6af6; color: #fff; }
+  .tab-btn .tab-count {
+    background: rgba(0,0,0,0.1); padding: 1px 8px; border-radius: 10px;
+    font-size: 0.7rem; font-weight: 700;
+  }
+  .tab-btn.active .tab-count { background: rgba(255,255,255,0.25); }
+
+  /* Results */
+  .results-section { display: none; }
+  .results-section.visible { display: block; }
+  .results-title {
+    font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px;
+    color: #636e72; margin-bottom: 14px;
+  }
+  .results { display: flex; flex-direction: column; gap: 14px; }
+
+  .lead-card.cold-card { opacity: 0.6; }
+
+  .lead-card {
+    background: #fff; border: 1px solid #e0e3ea; border-radius: 12px;
+    padding: 22px 24px; opacity: 0; transform: translateY(8px);
+    animation: cardIn 0.35s ease forwards;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: box-shadow 0.2s;
+  }
+  .lead-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+
+  @keyframes cardIn { to { opacity: 1; transform: translateY(0); } }
+
+  .lead-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+  .lead-name { font-size: 1.05rem; font-weight: 700; color: #1a1a2e; }
+  .lead-title { color: #636e72; font-size: 0.85rem; margin-top: 3px; }
+  .lead-company { color: #636e72; font-size: 0.8rem; font-weight: 500; margin-top: 2px; }
+  .lead-location { color: #b2bec3; font-size: 0.75rem; margin-top: 2px; }
+  .lead-meta { display: flex; gap: 12px; margin-top: 6px; flex-wrap: wrap; }
+  .lead-meta span { color: #b2bec3; font-size: 0.7rem; }
+
+  .hiring-badge {
+    background: #fff3e0; color: #e17055; padding: 2px 8px; border-radius: 4px;
+    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.5px; vertical-align: middle; margin-left: 6px;
+  }
+
+  .score-badge { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 70px; }
+  .score-num { font-size: 1.7rem; font-weight: 800; }
+  .score-num.green { color: #00b894; }
+  .score-num.yellow { color: #fdcb6e; }
+  .score-num.gray { color: #dfe6e9; }
+  .score-bar { width: 70px; height: 5px; background: #edf0f5; border-radius: 3px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .score-fill.green { background: #00b894; }
+  .score-fill.yellow { background: #fdcb6e; }
+
+  .qual-badge { font-size: 0.6rem; padding: 2px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+  .qual-badge.buyer { background: #e8f8f0; color: #00b894; }
+  .qual-badge.evaluating { background: #fef9e7; color: #f39c12; }
+  .qual-badge.cold-badge { background: #f0f2f5; color: #b2bec3; }
+
+  .lead-email {
+    background: #f8f9fc; border: 1px solid #e0e3ea; border-radius: 8px;
+    padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; cursor: pointer; transition: border-color 0.2s, background 0.2s;
+  }
+  .lead-email:hover { border-color: #4f6af6; background: #f0f4ff; }
+  .lead-email span { font-family: 'SF Mono', 'Fira Code', monospace; color: #4f6af6; font-size: 0.85rem; font-weight: 500; }
+  .copy-hint { color: #b2bec3 !important; font-size: 0.7rem !important; font-family: -apple-system, sans-serif !important; }
+  .no-email { color: #dfe6e9; font-style: italic; font-size: 0.8rem; margin-bottom: 10px; }
+
+  .lead-link { display: inline-block; color: #4f6af6; font-size: 0.8rem; text-decoration: none; margin-bottom: 10px; font-weight: 500; }
+  .lead-link:hover { text-decoration: underline; }
+
+  .signals { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+  .signal-tag { background: #f0f4ff; color: #4f6af6; padding: 3px 10px; border-radius: 4px; font-size: 0.7rem; font-weight: 500; }
+  .persona-tag { background: #e8f8f0; color: #00b894; padding: 3px 10px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+  .reasoning { color: #b2bec3; font-size: 0.8rem; font-style: italic; }
+
+  .empty-state { text-align: center; padding: 48px 20px; color: #b2bec3; display: none; }
+  .empty-state.visible { display: block; }
+  .empty-state p { font-size: 1rem; margin-bottom: 6px; color: #636e72; }
+
+  @media (max-width: 800px) {
+    .search-form { grid-template-columns: 1fr; }
+    .funnel-row { flex-direction: column; }
+    .funnel-arrow { transform: rotate(90deg); margin: -8px 0; }
+    .pipeline-header { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>LinkedIn Lead Intelligence</h1>
+    <p>Find warm leads with AI-powered intent scoring</p>
+  </header>
+
+  <div class="search-form">
+    <div class="field">
+      <label>Keyword</label>
+      <input type="text" id="keyword" placeholder="e.g. Brand Manager, Founder">
+    </div>
+    <div class="field">
+      <label>Location</label>
+      <input type="text" id="location" placeholder="e.g. Singapore, Malaysia">
+    </div>
+    <div class="field">
+      <label>Max Profiles</label>
+      <input type="number" id="limit" value="10" min="1" max="50">
+    </div>
+    <button class="btn-primary" id="searchBtn" onclick="startSearch()">Search</button>
+  </div>
+
+  <div class="pipeline" id="pipeline">
+    <div class="pipeline-header">
+      <div class="pipeline-step" id="ps1"><div class="step-dot">1</div><span>Scraping</span></div>
+      <div class="step-line" id="sl1"></div>
+      <div class="pipeline-step" id="ps2"><div class="step-dot">2</div><span>Scoring</span></div>
+      <div class="step-line" id="sl2"></div>
+      <div class="pipeline-step" id="ps3"><div class="step-dot">3</div><span>Complete</span></div>
+    </div>
+  </div>
+
+  <div class="status-area" id="statusArea">
+    <div class="status-main" id="statusMain"></div>
+    <div class="status-sub" id="statusSub"></div>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <!-- Scoring slide-through -->
+  <div class="scoring-stage" id="scoringStage">
+    <div class="scoring-header">
+      <div class="scoring-title">AI Scoring</div>
+      <div class="scoring-counter" id="scoringCounter">0 / 0</div>
+    </div>
+    <div class="scoring-track" id="scoringTrack">
+      <div style="color:#b2bec3; font-size:0.85rem;">Waiting for profiles...</div>
+    </div>
+  </div>
+
+  <!-- Funnel -->
+  <div class="funnel" id="funnel">
+    <div class="funnel-row">
+      <div class="funnel-card">
+        <div class="funnel-icon profiles">
+          <svg width="24" height="24" fill="none" stroke="#4f6af6" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="funnel-num" id="funnelProfiles">0</div>
+        <div class="funnel-label">Total Profiles</div>
+        <div class="funnel-bar"><div class="funnel-fill profiles" id="funnelBarProfiles" style="width:0%"></div></div>
+        <button class="funnel-btn" onclick="window.location.href='/api/export/all'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+      </div>
+
+      <div class="funnel-arrow">&rsaquo;</div>
+
+      <div class="funnel-card">
+        <div class="funnel-icon emails">
+          <svg width="24" height="24" fill="none" stroke="#f39c12" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </div>
+        <div class="funnel-num" id="funnelEmails">0</div>
+        <div class="funnel-label">With Email</div>
+        <div class="funnel-bar"><div class="funnel-fill emails" id="funnelBarEmails" style="width:0%"></div></div>
+        <button class="funnel-btn" onclick="window.location.href='/api/export/with-email'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+      </div>
+
+      <div class="funnel-arrow">&rsaquo;</div>
+
+      <div class="funnel-card">
+        <div class="funnel-icon warm">
+          <svg width="24" height="24" fill="none" stroke="#00b894" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <div class="funnel-num" id="funnelWarm">0</div>
+        <div class="funnel-label">Warm Leads</div>
+        <div class="funnel-bar"><div class="funnel-fill warm" id="funnelBarWarm" style="width:0%"></div></div>
+        <button class="funnel-btn" id="warmExportBtn" onclick="window.location.href='/api/export/warm'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tabs-bar" id="tabsBar">
+    <button class="tab-btn active" id="tabAll" onclick="switchTab('all')">All Profiles <span class="tab-count" id="tabAllCount">0</span></button>
+    <button class="tab-btn" id="tabEmail" onclick="switchTab('email')">With Email <span class="tab-count" id="tabEmailCount">0</span></button>
+    <button class="tab-btn" id="tabWarm" onclick="switchTab('warm')">Warm Leads <span class="tab-count" id="tabWarmCount">0</span></button>
+  </div>
+
+  <!-- All Profiles Section -->
+  <div class="results-section" id="allProfilesSection">
+    <div class="results-title" id="allProfilesTitle">All Profiles</div>
+    <div class="results" id="allProfilesList"></div>
+  </div>
+
+  <!-- With Email Section -->
+  <div class="results-section" id="emailProfilesSection">
+    <div class="results-title" id="emailProfilesTitle">Profiles With Email</div>
+    <div class="results" id="emailProfilesList"></div>
+  </div>
+
+  <!-- Warm Leads Section -->
+  <div class="results-section" id="warmSection">
+    <div class="results-title" id="warmTitle">Warm Leads</div>
+    <div class="results" id="warmList"></div>
+  </div>
+
+  <div class="empty-state" id="emptyState">
+    <p>No warm leads found in this search.</p>
+    <small>Try a broader keyword or different location. You can still download all profiles above.</small>
+  </div>
+</div>
+
+<script>
+  let allScoredLeads = [];
+  let totalToScore = 0;
+  let scoredCount = 0;
+  let queueProfiles = [];
+  let dotInterval = null;
+  let msgInterval = null;
+
+  const SCRAPING_MESSAGES = [
+    "Scanning LinkedIn's network for matching profiles...",
+    "Digging through thousands of professional profiles...",
+    "Our AI agents are infiltrating LinkedIn as we speak...",
+    "Matching keywords against millions of profiles...",
+    "Cross-referencing job titles and industries...",
+    "Checking company pages for decision-makers...",
+    "Hunting for the perfect leads just for you...",
+    "Sifting through the noise to find the gold...",
+    "Reading between the lines of LinkedIn bios...",
+    "Almost there... quality takes a moment...",
+    "Extracting email addresses where available...",
+    "Mapping the professional landscape...",
+    "Identifying key decision-makers in your niche...",
+    "Building your lead pipeline from scratch...",
+    "Pulling in rich profile data for scoring...",
+  ];
+
+  const AVATAR_COLORS = [
+    '#4f6af6', '#00b894', '#e17055', '#6c5ce7', '#00cec9',
+    '#fd79a8', '#0984e3', '#fdcb6e', '#e84393', '#55efc4',
+  ];
+
+  function getInitials(name) {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return parts[0][0].toUpperCase();
+  }
+
+  function getAvatarColor(index) {
+    return AVATAR_COLORS[index % AVATAR_COLORS.length];
+  }
+
+  function setPipeline(step, allDone) {
+    for (let i = 1; i <= 3; i++) {
+      const ps = document.getElementById('ps' + i);
+      ps.classList.remove('active', 'done');
+      if (allDone || i < step) ps.classList.add('done');
+      else if (i === step) ps.classList.add('active');
+    }
+    for (let i = 1; i <= 2; i++) {
+      const sl = document.getElementById('sl' + i);
+      sl.classList.toggle('done', allDone || i < step);
+    }
+  }
+
+  function showStatus(main, sub) {
+    const area = document.getElementById('statusArea');
+    area.classList.add('visible');
+    document.getElementById('statusMain').textContent = main;
+    if (sub !== undefined) document.getElementById('statusSub').textContent = sub;
+  }
+
+  function hideStatus() {
+    document.getElementById('statusArea').classList.remove('visible');
+    stopRotatingMessages();
+  }
+
+  function startRotatingMessages() {
+    stopRotatingMessages();
+    let idx = 0;
+    const subEl = document.getElementById('statusSub');
+
+    // Animate dots
+    let dots = 0;
+    dotInterval = setInterval(() => {
+      dots = (dots + 1) % 4;
+      const dotsEl = document.getElementById('statusDots');
+      if (dotsEl) dotsEl.textContent = '.'.repeat(dots);
+    }, 400);
+
+    // Rotate messages
+    msgInterval = setInterval(() => {
+      subEl.classList.add('fade');
+      setTimeout(() => {
+        idx = (idx + 1) % SCRAPING_MESSAGES.length;
+        subEl.textContent = SCRAPING_MESSAGES[idx];
+        subEl.classList.remove('fade');
+      }, 300);
+    }, 3000);
+  }
+
+  function stopRotatingMessages() {
+    if (dotInterval) { clearInterval(dotInterval); dotInterval = null; }
+    if (msgInterval) { clearInterval(msgInterval); msgInterval = null; }
+  }
+
+  function showSlideCard(profile, index, state) {
+    const track = document.getElementById('scoringTrack');
+    track.innerHTML = '';
+
+    const card = document.createElement('div');
+    card.className = 'slide-card enter';
+    card.id = 'currentSlide';
+
+    const color = getAvatarColor(index);
+    const initials = getInitials(profile.name);
+
+    card.innerHTML = `
+      <div class="slide-avatar" style="background:${color}">${initials}</div>
+      <div class="slide-info">
+        <div class="slide-name">${esc(profile.name || 'Unknown')}</div>
+        <div class="slide-detail">${esc(profile.headline || profile.company || '')}</div>
+      </div>
+      <div class="slide-score-area" id="slideScoreArea">
+        <div class="slide-spinner"></div>
+        <div class="slide-label scoring">Analyzing</div>
+      </div>
+    `;
+    track.appendChild(card);
+
+    // Remove enter animation after it completes
+    setTimeout(() => {
+      card.classList.remove('enter');
+      card.classList.add('scoring-active');
+    }, 600);
+  }
+
+  function updateSlideScore(score) {
+    const area = document.getElementById('slideScoreArea');
+    if (!area) return;
+
+    const isWarm = score >= 60;
+    area.innerHTML = `
+      <div class="slide-score ${isWarm ? 'warm' : 'cold'}">${score}</div>
+      <div class="slide-label ${isWarm ? 'warm' : 'cold'}">${isWarm ? 'Warm Lead' : 'Cold'}</div>
+    `;
+  }
+
+  function slideOut() {
+    return new Promise(resolve => {
+      const card = document.getElementById('currentSlide');
+      if (!card) { resolve(); return; }
+      card.classList.remove('scoring-active');
+      card.classList.add('exit');
+      setTimeout(resolve, 600);
+    });
+  }
+
+  function startSearch() {
+    const keyword = document.getElementById('keyword').value.trim();
+    const location = document.getElementById('location').value.trim();
+    const limit = parseInt(document.getElementById('limit').value) || 10;
+
+    if (!keyword) { alert('Please enter a keyword.'); return; }
+
+    const btn = document.getElementById('searchBtn');
+    btn.disabled = true;
+    btn.textContent = 'Searching...';
+
+    // Reset
+    allScoredLeads = [];
+    totalToScore = 0;
+    scoredCount = 0;
+    queueProfiles = [];
+
+    document.getElementById('pipeline').classList.add('visible');
+    document.getElementById('funnel').classList.remove('visible');
+    document.getElementById('tabsBar').classList.remove('visible');
+    document.getElementById('allProfilesSection').classList.remove('visible');
+    document.getElementById('emailProfilesSection').classList.remove('visible');
+    document.getElementById('warmSection').classList.remove('visible');
+    document.getElementById('emptyState').classList.remove('visible');
+    document.getElementById('errorMsg').classList.remove('visible');
+    document.getElementById('scoringStage').classList.remove('visible');
+    document.getElementById('allProfilesList').innerHTML = '';
+    document.getElementById('emailProfilesList').innerHTML = '';
+    document.getElementById('warmList').innerHTML = '';
+    setPipeline(1);
+
+    showStatus(
+      'Searching LinkedIn for "' + keyword + '"...',
+      SCRAPING_MESSAGES[0]
+    );
+    startRotatingMessages();
+
+    const params = new URLSearchParams({ keyword, location, limit });
+    const evtSource = new EventSource('/api/search/stream?' + params);
+
+    evtSource.addEventListener('status', (e) => {
+      const d = JSON.parse(e.data);
+      document.getElementById('statusMain').textContent = d.message;
+    });
+
+    evtSource.addEventListener('scrape_done', (e) => {
+      const d = JSON.parse(e.data);
+      stopRotatingMessages();
+      showStatus(
+        `Found ${d.total_scraped} profiles (${d.total_with_email} with emails)`,
+        'Preparing AI scoring engine...'
+      );
+      setPipeline(2);
+    });
+
+    evtSource.addEventListener('queue', (e) => {
+      const d = JSON.parse(e.data);
+      queueProfiles = d.profiles;
+      totalToScore = d.profiles.length;
+      scoredCount = 0;
+
+      document.getElementById('scoringStage').classList.add('visible');
+      document.getElementById('scoringCounter').textContent = `0 / ${totalToScore}`;
+      showStatus('AI is scoring each profile for buying intent...', 'This uses GPT-4o to analyze signals');
+    });
+
+    evtSource.addEventListener('scoring', (e) => {
+      const d = JSON.parse(e.data);
+      const profile = queueProfiles[d.index] || { name: d.name };
+      showSlideCard(profile, d.index, 'scoring');
+      document.getElementById('statusMain').textContent = `Scoring: ${d.name}`;
+      document.getElementById('statusSub').textContent = `Profile ${d.index + 1} of ${totalToScore}`;
+    });
+
+    evtSource.addEventListener('scored', async (e) => {
+      const d = JSON.parse(e.data);
+      const lead = d.lead;
+      allScoredLeads.push(lead);
+      scoredCount++;
+
+      // Update counter
+      document.getElementById('scoringCounter').textContent = `${scoredCount} / ${totalToScore}`;
+
+      // Show score on current card, pause so user can read, then slide out
+      updateSlideScore(lead.intent_score);
+      await new Promise(r => setTimeout(r, 1200));
+      await slideOut();
+    });
+
+    evtSource.addEventListener('complete', (e) => {
+      const d = JSON.parse(e.data);
+      evtSource.close();
+
+      hideStatus();
+      document.getElementById('scoringStage').classList.remove('visible');
+
+      // Cache results to localStorage
+      const cacheData = {
+        leads: allScoredLeads,
+        total_scraped: d.total_scraped,
+        total_with_email: d.total_with_email,
+        warm_leads: d.warm_leads,
+        keyword: document.getElementById('keyword').value.trim(),
+        location: document.getElementById('location').value.trim(),
+        timestamp: Date.now(),
+      };
+      localStorage.setItem('leadIntelCache', JSON.stringify(cacheData));
+
+      showResults(allScoredLeads, d.total_scraped, d.total_with_email, d.warm_leads);
+
+      btn.disabled = false;
+      btn.textContent = 'Search';
+    });
+
+    evtSource.addEventListener('error', (e) => {
+      if (!e.data) return;
+      const d = JSON.parse(e.data);
+      evtSource.close();
+      hideStatus();
+      document.getElementById('errorMsg').textContent = d.message;
+      document.getElementById('errorMsg').classList.add('visible');
+      btn.disabled = false;
+      btn.textContent = 'Search';
+    });
+
+    evtSource.onerror = () => {
+      evtSource.close();
+      hideStatus();
+      btn.disabled = false;
+      btn.textContent = 'Search';
+    };
+  }
+
+  function showResults(leads, totalScraped, totalWithEmail, warmCount) {
+    setPipeline(3, true);
+
+    // Funnel
+    document.getElementById('funnelProfiles').textContent = totalScraped;
+    document.getElementById('funnelEmails').textContent = totalWithEmail;
+    document.getElementById('funnelWarm').textContent = warmCount;
+
+    document.getElementById('funnelBarProfiles').style.width = '100%';
+    document.getElementById('funnelBarEmails').style.width = totalScraped > 0 ? ((totalWithEmail / totalScraped) * 100) + '%' : '0%';
+    document.getElementById('funnelBarWarm').style.width = totalScraped > 0 ? ((warmCount / totalScraped) * 100) + '%' : '0%';
+
+    document.getElementById('funnel').classList.add('visible');
+    document.getElementById('pipeline').classList.add('visible');
+
+    // Sort and split
+    leads.sort((a, b) => b.intent_score - a.intent_score);
+    const emailLeads = leads.filter(l => l.email);
+    const warmLeads = leads.filter(l => l.intent_score >= 60);
+
+    // Tab counts
+    document.getElementById('tabAllCount').textContent = leads.length;
+    document.getElementById('tabEmailCount').textContent = emailLeads.length;
+    document.getElementById('tabWarmCount').textContent = warmLeads.length;
+
+    // Render all three lists
+    renderLeads(leads, 'allProfilesList');
+    renderLeads(emailLeads, 'emailProfilesList');
+    renderLeads(warmLeads, 'warmList');
+
+    document.getElementById('allProfilesTitle').textContent = `All Profiles (${leads.length})`;
+    document.getElementById('emailProfilesTitle').textContent = `Profiles With Email (${emailLeads.length})`;
+    document.getElementById('warmTitle').textContent = `Warm Leads (${warmLeads.length})`;
+
+    // Show tabs
+    document.getElementById('tabsBar').classList.add('visible');
+    if (warmLeads.length > 0) {
+      switchTab('warm');
+    } else {
+      switchTab('all');
+      document.getElementById('emptyState').classList.add('visible');
+    }
+  }
+
+  // Restore cached results on page load
+  (function restoreCache() {
+    try {
+      const raw = localStorage.getItem('leadIntelCache');
+      if (!raw) return;
+      const cache = JSON.parse(raw);
+      if (!cache.leads || !cache.leads.length) return;
+
+      allScoredLeads = cache.leads;
+
+      // Restore search form values
+      if (cache.keyword) document.getElementById('keyword').value = cache.keyword;
+      if (cache.location) document.getElementById('location').value = cache.location;
+
+      showResults(cache.leads, cache.total_scraped, cache.total_with_email, cache.warm_leads);
+    } catch (e) {
+      // Ignore corrupt cache
+    }
+  })();
+
+  function switchTab(tab) {
+    // Update active tab button
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    const tabMap = { all: 'tabAll', email: 'tabEmail', warm: 'tabWarm' };
+    document.getElementById(tabMap[tab]).classList.add('active');
+
+    // Show/hide sections
+    document.getElementById('allProfilesSection').classList.toggle('visible', tab === 'all');
+    document.getElementById('emailProfilesSection').classList.toggle('visible', tab === 'email');
+    document.getElementById('warmSection').classList.toggle('visible', tab === 'warm');
+  }
+
+  function renderLeads(leads, containerId) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+
+    leads.forEach((lead, i) => {
+      const scoreClass = lead.intent_score >= 70 ? 'green' : lead.intent_score >= 60 ? 'yellow' : 'gray';
+      const qualClass = lead.intent_score >= 70 ? 'buyer' : lead.intent_score >= 60 ? 'evaluating' : 'cold-badge';
+
+      const signals = (lead.top_signals || []).map(s => `<span class="signal-tag">${esc(s)}</span>`).join('');
+      const personaBadge = lead.matched_persona && lead.matched_persona !== 'None'
+        ? `<span class="persona-tag">${esc(lead.matched_persona)}</span>` : '';
+      const linkedinLink = lead.linkedin_url
+        ? `<a class="lead-link" href="${esc(lead.linkedin_url)}" target="_blank" rel="noopener">View LinkedIn Profile</a>` : '';
+      const hiringBadge = lead.is_hiring ? '<span class="hiring-badge">HIRING</span>' : '';
+      const locationText = lead.location_text || lead.country || lead.city || '';
+
+      const emailBlock = lead.email
+        ? `<div class="lead-email" data-email="${esc(lead.email)}">
+            <span>${esc(lead.email)}</span>
+            <span class="copy-hint">Click to copy</span>
+          </div>`
+        : '<div class="no-email">No email found</div>';
+
+      const card = document.createElement('div');
+      card.className = 'lead-card';
+      card.style.animationDelay = (i * 0.06) + 's';
+      card.innerHTML = `
+        <div class="lead-header">
+          <div>
+            <div class="lead-name">${esc(lead.name || (lead.first_name + ' ' + lead.last_name).trim())}${hiringBadge}</div>
+            <div class="lead-title">${esc(lead.headline)}</div>
+            <div class="lead-company">${esc(lead.company)}</div>
+            <div class="lead-location">${esc(locationText)}</div>
+            <div class="lead-meta">
+              ${lead.connections ? '<span>' + lead.connections.toLocaleString() + ' connections</span>' : ''}
+              ${lead.followers ? '<span>' + lead.followers.toLocaleString() + ' followers</span>' : ''}
+            </div>
+          </div>
+          <div class="score-badge">
+            <div class="score-num ${scoreClass}">${lead.intent_score}</div>
+            <div class="score-bar"><div class="score-fill ${scoreClass}" style="width:${lead.intent_score}%"></div></div>
+            <div class="qual-badge ${qualClass}">${esc(lead.qualification_state)}</div>
+          </div>
+        </div>
+        ${emailBlock}
+        ${linkedinLink}
+        <div class="signals">${personaBadge}${signals}</div>
+        <div class="reasoning">${esc(lead.reasoning)}</div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  // Event delegation for email copy buttons
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('.lead-email');
+    if (!el) return;
+    const email = el.getAttribute('data-email');
+    if (!email) return;
+    navigator.clipboard.writeText(email).then(() => {
+      const hint = el.querySelector('.copy-hint');
+      hint.textContent = 'Copied!';
+      setTimeout(() => { hint.textContent = 'Click to copy'; }, 1500);
+    });
+  });
+
+  function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+</script>
+</body>
+</html>

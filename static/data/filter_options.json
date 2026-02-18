@@ -1,0 +1,73 @@
+{
+  "yearsOfExperience": [
+    {"id": "1", "label": "Less than 1 year"},
+    {"id": "2", "label": "1 to 2 years"},
+    {"id": "3", "label": "3 to 5 years"},
+    {"id": "4", "label": "6 to 10 years"},
+    {"id": "5", "label": "More than 10 years"}
+  ],
+  "yearsAtCurrentCompany": [
+    {"id": "1", "label": "Less than 1 year"},
+    {"id": "2", "label": "1 to 2 years"},
+    {"id": "3", "label": "3 to 5 years"},
+    {"id": "4", "label": "6 to 10 years"},
+    {"id": "5", "label": "More than 10 years"}
+  ],
+  "seniorityLevels": [
+    {"id": "100", "label": "In Training"},
+    {"id": "110", "label": "Entry Level"},
+    {"id": "120", "label": "Senior"},
+    {"id": "130", "label": "Strategic"},
+    {"id": "200", "label": "Entry Level Manager"},
+    {"id": "210", "label": "Experienced Manager"},
+    {"id": "220", "label": "Director"},
+    {"id": "300", "label": "Vice President"},
+    {"id": "310", "label": "CXO"},
+    {"id": "320", "label": "Owner / Partner"}
+  ],
+  "functions": [
+    {"id": "1", "label": "Accounting"},
+    {"id": "2", "label": "Administrative"},
+    {"id": "3", "label": "Arts and Design"},
+    {"id": "4", "label": "Business Development"},
+    {"id": "5", "label": "Community and Social Services"},
+    {"id": "6", "label": "Consulting"},
+    {"id": "26", "label": "Customer Success and Support"},
+    {"id": "7", "label": "Education"},
+    {"id": "8", "label": "Engineering"},
+    {"id": "9", "label": "Entrepreneurship"},
+    {"id": "10", "label": "Finance"},
+    {"id": "11", "label": "Healthcare Services"},
+    {"id": "12", "label": "Human Resources"},
+    {"id": "13", "label": "Information Technology"},
+    {"id": "14", "label": "Legal"},
+    {"id": "15", "label": "Marketing"},
+    {"id": "16", "label": "Media and Communication"},
+    {"id": "17", "label": "Military and Protective Services"},
+    {"id": "18", "label": "Operations"},
+    {"id": "19", "label": "Product Management"},
+    {"id": "20", "label": "Program and Project Management"},
+    {"id": "21", "label": "Purchasing"},
+    {"id": "22", "label": "Quality Assurance"},
+    {"id": "23", "label": "Real Estate"},
+    {"id": "24", "label": "Research"},
+    {"id": "25", "label": "Sales"}
+  ],
+  "profileLanguages": [
+    "Arabic", "Bahasa Indonesia", "Chinese", "Czech", "Danish", "Dutch",
+    "English", "French", "German", "Italian", "Japanese", "Korean",
+    "Malay", "Norwegian", "Polish", "Portuguese", "Romanian", "Russian",
+    "Spanish", "Swedish", "Tagalog", "Turkish"
+  ],
+  "companyHeadcount": [
+    {"id": "A", "label": "Self-Employed"},
+    {"id": "B", "label": "1-10"},
+    {"id": "C", "label": "11-50"},
+    {"id": "D", "label": "51-200"},
+    {"id": "E", "label": "201-500"},
+    {"id": "F", "label": "501-1,000"},
+    {"id": "G", "label": "1,001-5,000"},
+    {"id": "H", "label": "5,001-10,000"},
+    {"id": "I", "label": "10,001+"}
+  ]
+}

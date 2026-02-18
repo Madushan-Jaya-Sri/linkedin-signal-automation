@@ -1,13 +1,15 @@
+import asyncio
 import csv
 import io
 import json
-import asyncio
+import threading
+import uuid
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,107 +33,133 @@ all_profiles: list[dict] = []
 profiles_with_email: list[dict] = []
 warm_leads: list[dict] = []
 
+# Job store for polling-based search
+jobs: dict[str, dict] = {}
+
+
+def _run_search_job(job_id: str, keyword: str, location: str | None, limit: int):
+    """Background thread that scrapes and scores leads, updating job state as it goes."""
+    global all_profiles, profiles_with_email, warm_leads
+    job = jobs[job_id]
+
+    # Step 1: Scraping
+    job["step"] = "scraping"
+    try:
+        raw_leads = scrape_leads(keyword, location, limit=limit)
+    except Exception as e:
+        job["step"] = "error"
+        job["error"] = f"Apify scraper failed: {e}"
+        return
+
+    total_scraped = len(raw_leads)
+    total_with_email = sum(1 for l in raw_leads if l.get("email"))
+
+    # Build queue profiles
+    queue_items = []
+    for i, lead_data in enumerate(raw_leads):
+        queue_items.append({
+            "index": i,
+            "name": lead_data.get("name", "Unknown"),
+            "headline": lead_data.get("headline", ""),
+            "company": lead_data.get("company", ""),
+            "email": lead_data.get("email", ""),
+            "linkedin_url": lead_data.get("linkedin_url", ""),
+        })
+
+    job["step"] = "scoring"
+    job["total_scraped"] = total_scraped
+    job["total_with_email"] = total_with_email
+    job["queue"] = queue_items
+    job["total_to_score"] = len(raw_leads)
+
+    # Step 2: Score each lead
+    scored_leads = []
+    for i, lead_data in enumerate(raw_leads):
+        job["scoring_index"] = i
+        job["scoring_name"] = lead_data.get("name", "Unknown")
+
+        try:
+            scoring = score_lead(lead_data)
+            lead_data.update(scoring)
+            print(f"[SCORED {i+1}/{len(raw_leads)}] {lead_data.get('name', '?')} -> {scoring['intent_score']}")
+        except Exception as e:
+            print(f"[FAILED {i+1}/{len(raw_leads)}] {lead_data.get('name', '?')}: {e}")
+            lead_data["intent_score"] = 0
+            lead_data["qualification_state"] = "Cold Awareness"
+            lead_data["top_signals"] = []
+            lead_data["reasoning"] = ""
+            lead_data["matched_persona"] = "None"
+
+        lead = Lead(**{k: v for k, v in lead_data.items() if k in Lead.model_fields})
+        scored_leads.append(lead)
+        job["scored_leads"].append(lead.model_dump())
+        job["scored_count"] = i + 1
+
+    # Step 3: Final results
+    all_scored = [l.model_dump() for l in scored_leads]
+    all_scored.sort(key=lambda x: x["intent_score"], reverse=True)
+
+    all_profiles = all_scored
+    profiles_with_email = [l for l in all_scored if l.get("email")]
+    warm_leads = [l for l in all_scored if l["intent_score"] >= 60]
+
+    job["step"] = "complete"
+    job["total_with_email"] = len(profiles_with_email)
+    job["warm_count"] = len(warm_leads)
+
 
 @app.get("/")
 async def serve_index():
     return FileResponse("static/index.html")
 
 
-@app.get("/api/search/stream")
-async def search_leads_stream(request: Request, keyword: str, location: str = "", limit: int = 20):
-    """SSE endpoint that streams progress events as leads are scraped and scored."""
+@app.get("/api/search/start")
+async def start_search(keyword: str, location: str = "", limit: int = 20):
+    """Start a search job in the background and return a job_id for polling."""
     limit = min(int(limit), 50)
-    location = location if location else None
+    loc = location if location else None
 
-    async def event_generator():
-        global all_profiles, profiles_with_email, warm_leads
+    job_id = str(uuid.uuid4())[:8]
+    jobs[job_id] = {
+        "step": "starting",
+        "total_scraped": 0,
+        "total_with_email": 0,
+        "total_to_score": 0,
+        "scored_count": 0,
+        "scored_leads": [],
+        "scoring_index": -1,
+        "scoring_name": "",
+        "queue": [],
+        "warm_count": 0,
+        "error": "",
+    }
 
-        # Helper to send SSE events
-        def sse(event: str, data: dict) -> str:
-            return f"event: {event}\ndata: {json.dumps(data)}\n\n"
-
-        # Step 1: Scraping
-        yield sse("status", {"step": "scraping", "message": f"Searching LinkedIn for '{keyword}'..."})
-
-        try:
-            raw_leads = scrape_leads(keyword, location, limit=limit)
-        except Exception as e:
-            yield sse("error", {"message": f"Apify scraper failed: {e}"})
-            return
-
-        total_scraped = len(raw_leads)
-        total_with_email = sum(1 for l in raw_leads if l.get("email"))
-
-        yield sse("scrape_done", {
-            "total_scraped": total_scraped,
-            "total_with_email": total_with_email,
-        })
-
-        # Send all profiles to the queue (unscored)
-        queue_items = []
-        for i, lead_data in enumerate(raw_leads):
-            queue_items.append({
-                "index": i,
-                "name": lead_data.get("name", "Unknown"),
-                "headline": lead_data.get("headline", ""),
-                "company": lead_data.get("company", ""),
-                "email": lead_data.get("email", ""),
-                "linkedin_url": lead_data.get("linkedin_url", ""),
-            })
-        yield sse("queue", {"profiles": queue_items})
-
-        # Step 2: Score each lead one by one
-        scored_leads = []
-        for i, lead_data in enumerate(raw_leads):
-            # Check if client disconnected
-            if await request.is_disconnected():
-                return
-
-            yield sse("scoring", {"index": i, "name": lead_data.get("name", "Unknown")})
-
-            try:
-                scoring = score_lead(lead_data)
-                lead_data.update(scoring)
-                print(f"[SCORED {i+1}/{len(raw_leads)}] {lead_data.get('name', '?')} -> {scoring['intent_score']}")
-            except Exception as e:
-                print(f"[FAILED {i+1}/{len(raw_leads)}] {lead_data.get('name', '?')}: {e}")
-                lead_data["intent_score"] = 0
-                lead_data["qualification_state"] = "Cold Awareness"
-                lead_data["top_signals"] = []
-                lead_data["reasoning"] = ""
-                lead_data["matched_persona"] = "None"
-
-            lead = Lead(**{k: v for k, v in lead_data.items() if k in Lead.model_fields})
-            scored_leads.append(lead)
-
-            yield sse("scored", {"index": i, "lead": lead.model_dump()})
-
-            # Small delay to let the frontend render
-            await asyncio.sleep(0.05)
-
-        # Step 3: Final results — populate funnel stores
-        all_scored = [l.model_dump() for l in scored_leads]
-        all_scored.sort(key=lambda x: x["intent_score"], reverse=True)
-
-        all_profiles = all_scored
-        profiles_with_email = [l for l in all_scored if l.get("email")]
-        warm_leads = [l for l in all_scored if l["intent_score"] >= 60]
-
-        yield sse("complete", {
-            "total_scraped": total_scraped,
-            "total_with_email": len(profiles_with_email),
-            "warm_leads": len(warm_leads),
-        })
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
+    thread = threading.Thread(
+        target=_run_search_job,
+        args=(job_id, keyword, loc, limit),
+        daemon=True,
     )
+    thread.start()
+
+    return {"job_id": job_id}
+
+
+@app.get("/api/search/progress/{job_id}")
+async def get_progress(job_id: str):
+    """Poll this endpoint to get current job progress.
+
+    Keeps Lambda alive for 3 seconds so the background thread can make progress
+    (Lambda freezes threads between invocations).
+    """
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Keep Lambda execution context alive so the background thread can work
+    if job["step"] not in ("complete", "error"):
+        await asyncio.sleep(3)
+
+    return job
 
 
 def _build_csv(leads: list[dict], filename: str):

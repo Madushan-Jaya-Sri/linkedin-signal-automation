@@ -1,0 +1,14 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.git/
+.gitignore
+.DS_Store
+sample/
+logo.png
+deploy.sh
+Dockerfile
+.dockerignore
+*.md

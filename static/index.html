@@ -37,13 +37,14 @@
 
   .field { display: flex; flex-direction: column; gap: 6px; }
   .field label { font-size: 0.7rem; color: #636e72; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
-  .field input {
+  .field input, .field select {
     background: #f8f9fc; border: 1px solid #e0e3ea; border-radius: 8px;
     padding: 10px 14px; color: #2d3436; font-size: 0.9rem; outline: none;
     transition: border-color 0.2s, box-shadow 0.2s;
   }
-  .field input:focus { border-color: #4f6af6; box-shadow: 0 0 0 3px rgba(79,106,246,0.1); }
+  .field input:focus, .field select:focus { border-color: #4f6af6; box-shadow: 0 0 0 3px rgba(79,106,246,0.1); }
   .field input::placeholder { color: #b2bec3; }
+  .field select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23636e72' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
 
   .btn-primary {
     background: #4f6af6; color: #fff; border: none; border-radius: 8px;
@@ -319,6 +320,16 @@
   .empty-state.visible { display: block; }
   .empty-state p { font-size: 1rem; margin-bottom: 6px; color: #636e72; }
 
+  /* Footer */
+  .footer {
+    margin-top: 60px; padding: 32px 0 24px; border-top: 1px solid #e0e3ea;
+    display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center;
+  }
+  .footer-tagline { font-size: 0.8rem; color: #636e72; line-height: 1.6; max-width: 420px; }
+  .footer-logo { height: 30px; width: auto; }
+  .footer-copy { font-size: 0.7rem; color: #b2bec3; }
+  .footer-copy strong { color: #636e72; font-weight: 600; }
+
   @media (max-width: 800px) {
     .search-form { grid-template-columns: 1fr; }
     .funnel-row { flex-direction: column; }
@@ -340,8 +351,84 @@
       <input type="text" id="keyword" placeholder="e.g. Brand Manager, Founder">
     </div>
     <div class="field">
-      <label>Location</label>
-      <input type="text" id="location" placeholder="e.g. Singapore, Malaysia">
+      <label>Country</label>
+      <select id="location">
+        <option value="">All Countries</option>
+        <option value="Afghanistan">Afghanistan</option>
+        <option value="Albania">Albania</option>
+        <option value="Algeria">Algeria</option>
+        <option value="Argentina">Argentina</option>
+        <option value="Australia">Australia</option>
+        <option value="Austria">Austria</option>
+        <option value="Bahrain">Bahrain</option>
+        <option value="Bangladesh">Bangladesh</option>
+        <option value="Belgium">Belgium</option>
+        <option value="Brazil">Brazil</option>
+        <option value="Brunei">Brunei</option>
+        <option value="Cambodia">Cambodia</option>
+        <option value="Canada">Canada</option>
+        <option value="Chile">Chile</option>
+        <option value="China">China</option>
+        <option value="Colombia">Colombia</option>
+        <option value="Czech Republic">Czech Republic</option>
+        <option value="Denmark">Denmark</option>
+        <option value="Egypt">Egypt</option>
+        <option value="Estonia">Estonia</option>
+        <option value="Finland">Finland</option>
+        <option value="France">France</option>
+        <option value="Germany">Germany</option>
+        <option value="Ghana">Ghana</option>
+        <option value="Greece">Greece</option>
+        <option value="Hong Kong">Hong Kong</option>
+        <option value="Hungary">Hungary</option>
+        <option value="India">India</option>
+        <option value="Indonesia">Indonesia</option>
+        <option value="Ireland">Ireland</option>
+        <option value="Israel">Israel</option>
+        <option value="Italy">Italy</option>
+        <option value="Japan">Japan</option>
+        <option value="Jordan">Jordan</option>
+        <option value="Kenya">Kenya</option>
+        <option value="Kuwait">Kuwait</option>
+        <option value="Latvia">Latvia</option>
+        <option value="Lebanon">Lebanon</option>
+        <option value="Lithuania">Lithuania</option>
+        <option value="Luxembourg">Luxembourg</option>
+        <option value="Malaysia">Malaysia</option>
+        <option value="Mexico">Mexico</option>
+        <option value="Morocco">Morocco</option>
+        <option value="Myanmar">Myanmar</option>
+        <option value="Nepal">Nepal</option>
+        <option value="Netherlands">Netherlands</option>
+        <option value="New Zealand">New Zealand</option>
+        <option value="Nigeria">Nigeria</option>
+        <option value="Norway">Norway</option>
+        <option value="Oman">Oman</option>
+        <option value="Pakistan">Pakistan</option>
+        <option value="Peru">Peru</option>
+        <option value="Philippines">Philippines</option>
+        <option value="Poland">Poland</option>
+        <option value="Portugal">Portugal</option>
+        <option value="Qatar">Qatar</option>
+        <option value="Romania">Romania</option>
+        <option value="Russia">Russia</option>
+        <option value="Saudi Arabia">Saudi Arabia</option>
+        <option value="Singapore">Singapore</option>
+        <option value="South Africa">South Africa</option>
+        <option value="South Korea">South Korea</option>
+        <option value="Spain">Spain</option>
+        <option value="Sri Lanka">Sri Lanka</option>
+        <option value="Sweden">Sweden</option>
+        <option value="Switzerland">Switzerland</option>
+        <option value="Taiwan">Taiwan</option>
+        <option value="Thailand">Thailand</option>
+        <option value="Turkey">Turkey</option>
+        <option value="Ukraine">Ukraine</option>
+        <option value="United Arab Emirates">United Arab Emirates</option>
+        <option value="United Kingdom">United Kingdom</option>
+        <option value="United States">United States</option>
+        <option value="Vietnam">Vietnam</option>
+      </select>
     </div>
     <div class="field">
       <label>Max Profiles</label>
@@ -455,6 +542,12 @@
     <p>No warm leads found in this search.</p>
     <small>Try a broader keyword or different location. You can still download all profiles above.</small>
   </div>
+
+  <footer class="footer">
+    <div class="footer-tagline">AI-powered lead intelligence platform by <strong>Momentro</strong>. Find, score, and connect with the right prospects.</div>
+    <img src="/static/logo.png" alt="Momentro" class="footer-logo">
+    <div class="footer-copy">&copy; 2026 <strong>Momentro</strong>. All rights reserved.</div>
+  </footer>
 </div>
 
 <script>
@@ -468,7 +561,7 @@
   const SCRAPING_MESSAGES = [
     "Scanning LinkedIn's network for matching profiles...",
     "Digging through thousands of professional profiles...",
-    "Our AI agents are infiltrating LinkedIn as we speak...",
+    "Exploring LinkedIn's network as we speak...",
     "Matching keywords against millions of profiles...",
     "Cross-referencing job titles and industries...",
     "Checking company pages for decision-makers...",
@@ -605,7 +698,42 @@
     });
   }
 
-  function startSearch() {
+  let pollTimer = null;
+  let animQueue = [];  // Queue of leads waiting to be animated
+  let isAnimating = false;
+
+  async function processAnimQueue() {
+    if (isAnimating || animQueue.length === 0) return;
+    isAnimating = true;
+
+    while (animQueue.length > 0) {
+      const { lead, index } = animQueue.shift();
+      const profile = queueProfiles[index] || { name: lead.name };
+
+      // Show slide card entering
+      showSlideCard(profile, index, 'scoring');
+      document.getElementById('statusMain').textContent = `Scoring: ${lead.name || 'Unknown'}`;
+      document.getElementById('statusSub').textContent = `Profile ${index + 1} of ${totalToScore}`;
+
+      // Brief pause to show "Analyzing" state
+      await new Promise(r => setTimeout(r, 400));
+
+      // Show score
+      updateSlideScore(lead.intent_score);
+      scoredCount = index + 1;
+      document.getElementById('scoringCounter').textContent = `${scoredCount} / ${totalToScore}`;
+
+      // Pause to let user read the score
+      await new Promise(r => setTimeout(r, 1200));
+
+      // Slide out
+      await slideOut();
+    }
+
+    isAnimating = false;
+  }
+
+  async function startSearch() {
     const keyword = document.getElementById('keyword').value.trim();
     const location = document.getElementById('location').value.trim();
     const limit = parseInt(document.getElementById('limit').value) || 10;
@@ -621,6 +749,9 @@
     totalToScore = 0;
     scoredCount = 0;
     queueProfiles = [];
+    animQueue = [];
+    isAnimating = false;
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 
     document.getElementById('pipeline').classList.add('visible');
     document.getElementById('funnel').classList.remove('visible');
@@ -642,100 +773,114 @@
     );
     startRotatingMessages();
 
+    // Start the search job
     const params = new URLSearchParams({ keyword, location, limit });
-    const evtSource = new EventSource('/api/search/stream?' + params);
-
-    evtSource.addEventListener('status', (e) => {
-      const d = JSON.parse(e.data);
-      document.getElementById('statusMain').textContent = d.message;
-    });
-
-    evtSource.addEventListener('scrape_done', (e) => {
-      const d = JSON.parse(e.data);
-      stopRotatingMessages();
-      showStatus(
-        `Found ${d.total_scraped} profiles (${d.total_with_email} with emails)`,
-        'Preparing AI scoring engine...'
-      );
-      setPipeline(2);
-    });
-
-    evtSource.addEventListener('queue', (e) => {
-      const d = JSON.parse(e.data);
-      queueProfiles = d.profiles;
-      totalToScore = d.profiles.length;
-      scoredCount = 0;
-
-      document.getElementById('scoringStage').classList.add('visible');
-      document.getElementById('scoringCounter').textContent = `0 / ${totalToScore}`;
-      showStatus('AI is scoring each profile for buying intent...', 'This uses GPT-4o to analyze signals');
-    });
-
-    evtSource.addEventListener('scoring', (e) => {
-      const d = JSON.parse(e.data);
-      const profile = queueProfiles[d.index] || { name: d.name };
-      showSlideCard(profile, d.index, 'scoring');
-      document.getElementById('statusMain').textContent = `Scoring: ${d.name}`;
-      document.getElementById('statusSub').textContent = `Profile ${d.index + 1} of ${totalToScore}`;
-    });
-
-    evtSource.addEventListener('scored', async (e) => {
-      const d = JSON.parse(e.data);
-      const lead = d.lead;
-      allScoredLeads.push(lead);
-      scoredCount++;
-
-      // Update counter
-      document.getElementById('scoringCounter').textContent = `${scoredCount} / ${totalToScore}`;
-
-      // Show score on current card, pause so user can read, then slide out
-      updateSlideScore(lead.intent_score);
-      await new Promise(r => setTimeout(r, 1200));
-      await slideOut();
-    });
-
-    evtSource.addEventListener('complete', (e) => {
-      const d = JSON.parse(e.data);
-      evtSource.close();
-
+    let jobId;
+    try {
+      const res = await fetch('/api/search/start?' + params);
+      const data = await res.json();
+      jobId = data.job_id;
+    } catch (e) {
       hideStatus();
-      document.getElementById('scoringStage').classList.remove('visible');
-
-      // Cache results to localStorage
-      const cacheData = {
-        leads: allScoredLeads,
-        total_scraped: d.total_scraped,
-        total_with_email: d.total_with_email,
-        warm_leads: d.warm_leads,
-        keyword: document.getElementById('keyword').value.trim(),
-        location: document.getElementById('location').value.trim(),
-        timestamp: Date.now(),
-      };
-      localStorage.setItem('leadIntelCache', JSON.stringify(cacheData));
-
-      showResults(allScoredLeads, d.total_scraped, d.total_with_email, d.warm_leads);
-
-      btn.disabled = false;
-      btn.textContent = 'Search';
-    });
-
-    evtSource.addEventListener('error', (e) => {
-      if (!e.data) return;
-      const d = JSON.parse(e.data);
-      evtSource.close();
-      hideStatus();
-      document.getElementById('errorMsg').textContent = d.message;
+      document.getElementById('errorMsg').textContent = 'Failed to start search. Please try again.';
       document.getElementById('errorMsg').classList.add('visible');
       btn.disabled = false;
       btn.textContent = 'Search';
-    });
+      return;
+    }
 
-    evtSource.onerror = () => {
-      evtSource.close();
-      hideStatus();
-      btn.disabled = false;
-      btn.textContent = 'Search';
-    };
+    // Poll for progress
+    let lastStep = '';
+    let lastScoredCount = 0;
+
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/search/progress/${jobId}`);
+        const job = await res.json();
+
+        // Handle error
+        if (job.step === 'error') {
+          clearInterval(pollTimer); pollTimer = null;
+          hideStatus();
+          document.getElementById('errorMsg').textContent = job.error;
+          document.getElementById('errorMsg').classList.add('visible');
+          btn.disabled = false;
+          btn.textContent = 'Search';
+          return;
+        }
+
+        // Transition: scraping → scoring
+        if (job.step === 'scoring' && lastStep !== 'scoring' && lastStep !== 'complete') {
+          stopRotatingMessages();
+          showStatus(
+            `Found ${job.total_scraped} profiles (${job.total_with_email} with emails)`,
+            'Preparing to score each profile...'
+          );
+          setPipeline(2);
+
+          // Set up queue
+          queueProfiles = job.queue;
+          totalToScore = job.total_to_score;
+          scoredCount = 0;
+
+          document.getElementById('scoringStage').classList.add('visible');
+          document.getElementById('scoringCounter').textContent = `0 / ${totalToScore}`;
+          showStatus('Scoring each profile for buying intent...', 'Analyzing signals and engagement patterns');
+        }
+
+        // Process new scored leads — queue them for animation
+        if (job.scored_leads && job.scored_leads.length > lastScoredCount) {
+          const newLeads = job.scored_leads.slice(lastScoredCount);
+          for (let i = 0; i < newLeads.length; i++) {
+            const lead = newLeads[i];
+            allScoredLeads.push(lead);
+            animQueue.push({ lead, index: lastScoredCount + i });
+          }
+          lastScoredCount = job.scored_leads.length;
+          processAnimQueue();
+        }
+
+        // Handle completion
+        if (job.step === 'complete') {
+          clearInterval(pollTimer); pollTimer = null;
+
+          // Wait for animation queue to finish
+          const waitForAnim = () => new Promise(resolve => {
+            const check = () => {
+              if (animQueue.length === 0 && !isAnimating) resolve();
+              else setTimeout(check, 200);
+            };
+            check();
+          });
+          await waitForAnim();
+
+          hideStatus();
+          document.getElementById('scoringStage').classList.remove('visible');
+
+          // Cache results
+          const cacheData = {
+            leads: allScoredLeads,
+            total_scraped: job.total_scraped,
+            total_with_email: job.total_with_email,
+            warm_leads: job.warm_count,
+            keyword: document.getElementById('keyword').value.trim(),
+            location: document.getElementById('location').value.trim(),
+            timestamp: Date.now(),
+          };
+          localStorage.setItem('leadIntelCache', JSON.stringify(cacheData));
+
+          showResults(allScoredLeads, job.total_scraped, job.total_with_email, job.warm_count);
+
+          btn.disabled = false;
+          btn.textContent = 'Search';
+        }
+
+        lastStep = job.step;
+      } catch (e) {
+        // Network error — keep polling, may recover
+        console.warn('Poll error:', e);
+      }
+    }, 1500);
   }
 
   function showResults(leads, totalScraped, totalWithEmail, warmCount) {
@@ -867,16 +1012,37 @@
     });
   }
 
+  function copyToClipboard(text) {
+    // Try modern API first, fall back to textarea method
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+
   // Event delegation for email copy buttons
   document.addEventListener('click', (e) => {
     const el = e.target.closest('.lead-email');
     if (!el) return;
+    e.preventDefault();
+    e.stopPropagation();
     const email = el.getAttribute('data-email');
     if (!email) return;
-    navigator.clipboard.writeText(email).then(() => {
+    copyToClipboard(email).then(() => {
       const hint = el.querySelector('.copy-hint');
-      hint.textContent = 'Copied!';
-      setTimeout(() => { hint.textContent = 'Click to copy'; }, 1500);
+      if (hint) {
+        hint.textContent = 'Copied!';
+        hint.style.color = '#00b894';
+        setTimeout(() => { hint.textContent = 'Click to copy'; hint.style.color = ''; }, 1500);
+      }
     });
   });
 

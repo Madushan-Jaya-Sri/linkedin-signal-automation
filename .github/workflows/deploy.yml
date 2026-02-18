@@ -31,7 +31,7 @@ jobs:
           ECR_REPOSITORY: linkedin-lead-intel
           IMAGE_TAG:       ${{ github.sha }}
         run: |
-          docker build --platform linux/amd64 \
+          docker build --platform linux/amd64 --provenance=false \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             .

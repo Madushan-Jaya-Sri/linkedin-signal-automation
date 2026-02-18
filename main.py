@@ -46,16 +46,23 @@ def _run_phase1(job_id: str, search_params: dict):
     """Background thread: Apify advanced search → local filter → split by email."""
     job = jobs[job_id]
 
-    # Step 1: Scrape
+    # Step 1: Scrape — progress_callback updates profiles_found in real-time
+    # so the frontend shows a live download counter instead of a frozen spinner.
     job["phase"] = "scraping"
+    job["scrape_status"] = "running_actor"
     try:
-        raw_profiles = scrape_profiles_advanced(search_params)
+        def _on_profile_downloaded(n: int):
+            job["profiles_found"] = n
+            job["scrape_status"] = "downloading"
+
+        raw_profiles = scrape_profiles_advanced(search_params, progress_callback=_on_profile_downloaded)
     except Exception as e:
         job["phase"] = "error"
         job["error"] = f"Profile search failed: {e}"
         return
 
     job["profiles_found"] = len(raw_profiles)
+    job["scrape_status"] = "done"
 
     # Step 2: Filter (only NOT exclusions — LinkedIn already matched positive terms)
     job["phase"] = "filtering"

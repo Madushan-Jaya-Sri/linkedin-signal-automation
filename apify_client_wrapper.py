@@ -167,11 +167,12 @@ def _parse_profile(item: dict) -> dict:
 
 # ─── Actor 1: Advanced Profile Search ────────────────────────
 
-def scrape_profiles_advanced(params: dict) -> list[dict]:
+def scrape_profiles_advanced(params: dict, progress_callback=None) -> list[dict]:
     """Search LinkedIn profiles using all advanced filter parameters.
 
-    Uses profileScraperMode: 'Short' for faster/cheaper results.
-    Post scraping happens separately via the posts actor.
+    Uses profileScraperMode: 'Full + email search' for rich data including emails.
+    progress_callback(n) is called after each profile is downloaded so callers
+    can update real-time counters while iterate_items() is running.
     """
     client = get_client()
 
@@ -208,6 +209,7 @@ def scrape_profiles_advanced(params: dict) -> list[dict]:
         timeout_secs=600,
     )
 
+    print("[INFO] Actor run complete — downloading dataset results...")
     results = []
     seen = set()
     for item in client.dataset(run["defaultDatasetId"]).iterate_items():
@@ -218,6 +220,9 @@ def scrape_profiles_advanced(params: dict) -> list[dict]:
         if linkedin_url:
             seen.add(linkedin_url)
         results.append(profile)
+        # Notify caller so UI can show real-time download progress
+        if progress_callback:
+            progress_callback(len(results))
 
     with_email = sum(1 for r in results if r["email"])
     print(f"[INFO] Found {len(results)} profiles, {with_email} with emails")

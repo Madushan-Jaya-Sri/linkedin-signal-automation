@@ -860,13 +860,18 @@
       return;
     }
 
-    if (job.phase === 'scraping' && lastPhase !== 'scraping') {
-      setPipeline(1);
+    if (job.phase === 'scraping') {
+      if (lastPhase !== 'scraping') setPipeline(1);
+      // Show live download counter once actor finishes and we're pulling dataset
+      if (job.scrape_status === 'downloading' && job.profiles_found > 0) {
+        document.getElementById('statusMain').textContent =
+          `Downloading profiles: ${job.profiles_found} so far...`;
+      }
     }
 
     if (job.phase === 'filtering' && lastPhase !== 'filtering') {
       stopMessages();
-      showStatus(`Found ${job.profiles_found} profiles. Filtering for relevance...`, '');
+      showStatus(`Found ${job.profiles_found} profiles. Applying filters...`, '');
       setPipeline(2);
     }
 

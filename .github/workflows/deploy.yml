@@ -53,4 +53,12 @@ jobs:
             --function-name linkedin-lead-intel \
             --region us-east-2
 
-          echo "✅ Deployed $IMAGE_TAG to linkedin-lead-intel"
+          # Lock to 1 concurrent instance so in-memory job state is never split
+          # across containers. uvicorn handles multiple async requests within the
+          # single container, so this does not limit throughput for a single user.
+          aws lambda put-function-concurrency \
+            --function-name linkedin-lead-intel \
+            --reserved-concurrent-executions 1 \
+            --region us-east-2
+
+          echo "✅ Deployed $IMAGE_TAG to linkedin-lead-intel (concurrency=1)"

@@ -926,13 +926,32 @@
         setPipeline(6, true);
         renderResults(job.analyzed_profiles);
 
-        // Cache
-        localStorage.setItem('leadIntelCache', JSON.stringify({
-          analyzed: job.analyzed_profiles,
-          searchQuery: document.getElementById('searchQuery').value.trim(),
-          timestamp: Date.now(),
-          jobId: jobId,
+        // Cache to localStorage.
+        // Trim posts to 30 per profile to stay within the ~5MB localStorage limit
+        // while still giving the AI enough context after a browser refresh.
+        const toCache = job.analyzed_profiles.map(p => ({
+          ...p,
+          posts: (p.posts || []).slice(0, 30),
         }));
+        try {
+          localStorage.setItem('leadIntelCache', JSON.stringify({
+            analyzed: toCache,
+            searchQuery: document.getElementById('searchQuery').value.trim(),
+            timestamp: Date.now(),
+            jobId: jobId,
+          }));
+        } catch (e) {
+          // QuotaExceededError — try without posts as a last resort
+          try {
+            const minimal = job.analyzed_profiles.map(p => ({...p, posts: []}));
+            localStorage.setItem('leadIntelCache', JSON.stringify({
+              analyzed: minimal,
+              searchQuery: document.getElementById('searchQuery').value.trim(),
+              timestamp: Date.now(),
+              jobId: jobId,
+            }));
+          } catch (_) { /* storage unavailable — results won't persist across refresh */ }
+        }
 
         btn.disabled = false; btn.textContent = 'Search';
       });

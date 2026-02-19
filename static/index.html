@@ -824,6 +824,9 @@
       });
       const result = await res.json();
       jobId = result.job_id;
+      // Persist immediately so a browser refresh can reconnect to this job
+      localStorage.setItem('leadIntelJobId', jobId);
+      localStorage.setItem('leadIntelSearchQuery', data.searchQuery);
     } catch (e) {
       hideStatus(); showError('Failed to start search. Please try again.');
       btn.disabled = false; btn.textContent = 'Search';
@@ -855,6 +858,7 @@
 
     if (job.phase === 'error') {
       clearInterval(pollTimer); pollTimer = null;
+      localStorage.removeItem('leadIntelJobId');
       hideStatus(); showError(job.error);
       btn.disabled = false; btn.textContent = 'Search';
       return;
@@ -921,6 +925,7 @@
         check();
       });
       waitAnim().then(() => {
+        localStorage.removeItem('leadIntelJobId');
         hideStatus();
         document.getElementById('scoringStage').classList.remove('visible');
         setPipeline(6, true);
@@ -1472,8 +1477,76 @@
     });
   });
 
-  // Restore cache on load
-  (function restoreCache() {
+  // On page load: reconnect to an in-progress job OR restore completed results
+  (async function onPageLoad() {
+    const savedJobId    = localStorage.getItem('leadIntelJobId');
+    const savedQuery    = localStorage.getItem('leadIntelSearchQuery');
+    const btn           = document.getElementById('searchBtn');
+
+    if (savedJobId) {
+      try {
+        const res = await fetch(`/api/search/progress/${savedJobId}`);
+        if (!res.ok) throw new Error('not found');
+        const job = await res.json();
+        jobId = savedJobId;
+        if (savedQuery) document.getElementById('searchQuery').value = savedQuery;
+        document.getElementById('pipeline').classList.add('visible');
+
+        if (job.phase === 'complete') {
+          localStorage.removeItem('leadIntelJobId');
+          setPipeline(6, true);
+          renderResults(job.analyzed_profiles);
+          return;
+        }
+
+        if (job.phase === 'error') {
+          localStorage.removeItem('leadIntelJobId');
+          showError(job.error);
+          return;
+        }
+
+        if (job.phase === 'awaiting_selection') {
+          setPipeline(3);
+          renderSelection(job.profiles_with_email, job.profiles_without_email);
+          return;
+        }
+
+        // Job is still actively running (scraping / filtering / scraping_posts / analyzing)
+        btn.disabled = true;
+        btn.textContent = 'Searching...';
+
+        if (job.phase === 'scraping') {
+          setPipeline(1);
+          showStatus('Searching LinkedIn for matching profiles...', SCRAPING_MESSAGES[0]);
+          startMessages(SCRAPING_MESSAGES);
+        } else if (job.phase === 'filtering') {
+          setPipeline(2);
+          showStatus(`Found ${job.profiles_found} profiles. Applying filters...`, '');
+        } else if (job.phase === 'scraping_posts') {
+          setPipeline(4);
+          showStatus(`Scraping posts: ${job.posts_scraped} / ${job.posts_total}`, POST_MESSAGES[0]);
+          startMessages(POST_MESSAGES);
+        } else if (job.phase === 'analyzing') {
+          setPipeline(5);
+          document.getElementById('scoringStage').classList.add('visible');
+          // Skip animation for already-analyzed profiles — just set the counter
+          lastAnalyzedCount = job.analyzed_profiles.length;
+          document.getElementById('scoringCounter').textContent =
+            `${job.analyzed_profiles.length} / ${job.analyzed_total}`;
+          showStatus('Analyzing profiles with AI...', 'Resuming analysis...');
+        }
+
+        lastPhase = job.phase;
+        startPolling();
+        return;
+
+      } catch (e) {
+        // Job not found on server (server restarted) — fall through to cache
+        localStorage.removeItem('leadIntelJobId');
+      }
+    }
+
+    // No active job — restore completed results from cache
     try {
       const raw = localStorage.getItem('leadIntelCache');
       if (!raw) return;

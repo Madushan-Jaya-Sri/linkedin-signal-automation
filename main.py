@@ -110,7 +110,7 @@ def _run_phase2(job_id: str, selected_urls: list[str]):
     for i, profile in enumerate(selected):
         job["current_profile_name"] = profile.get("name", "Unknown")
         try:
-            posts = scrape_posts(profile["linkedin_url"], max_posts=100)
+            posts = scrape_posts(profile["linkedin_url"], max_posts=20)
             profile["posts"] = posts
         except Exception as e:
             print(f"[WARN] Failed to scrape posts for {profile.get('name')}: {e}")

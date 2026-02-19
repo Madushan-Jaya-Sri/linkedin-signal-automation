@@ -179,8 +179,8 @@ def scrape_profiles_advanced(params: dict, progress_callback=None) -> list[dict]
     # Build actor input — only include non-empty parameters
     run_input = {
         "searchQuery": params["searchQuery"],
-        # "maxItems": params.get("maxItems", 50),
-        "maxItems":10,
+        "maxItems": params.get("maxItems", 50),
+        # "maxItems":10,
         "profileScraperMode": "Full + email search",
     }
 
@@ -289,7 +289,7 @@ def filter_profiles(profiles: list[dict], search_query: str) -> list[dict]:
 
 # ─── Actor 2: LinkedIn User Posts ─────────────────────────────
 
-def scrape_posts(linkedin_url: str, max_posts: int = 30) -> list[dict]:
+def scrape_posts(linkedin_url: str, max_posts: int = 20) -> list[dict]:
     """Scrape LinkedIn posts for a single user profile."""
     client = get_client()
 

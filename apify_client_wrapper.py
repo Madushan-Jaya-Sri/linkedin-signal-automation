@@ -231,43 +231,59 @@ def scrape_profiles_advanced(params: dict, progress_callback=None) -> list[dict]
 
 # ─── Local Profile Filter ────────────────────────────────────
 
+def _stem(word: str) -> str:
+    """Minimal stemmer: strip a trailing 's' so 'managers' matches 'manager'."""
+    w = word.lower()
+    if len(w) > 3 and w.endswith('s'):
+        return w[:-1]
+    return w
+
+
 def filter_profiles(profiles: list[dict], search_query: str) -> list[dict]:
-    """Apply only NOT exclusions from the search query.
+    """Filter profiles by matching all query words against profile text.
 
-    LinkedIn's search engine already handles positive term matching, so
-    applying a second positive-match filter on Short-mode profiles (which
-    have sparse text) would incorrectly discard all results.
-
-    Only NOT terms are applied locally — e.g. 'brand manager NOT intern'
-    will exclude any profile whose text contains 'intern'.
+    Matching rules:
+    - Each word in the query must appear somewhere in the profile text
+      (name, headline, job title, company, about, skills, experience)
+    - Word order is ignored — 'brand manager' and 'manager brand' both match
+    - Singular/plural insensitive — trailing 's' is stripped before matching
+      so 'managers' matches profiles containing 'manager' or 'managers'
+    - Comparison is case-insensitive
     """
     query = search_query.strip()
     if not query:
         return profiles
 
-    # Extract NOT terms only
-    not_terms = re.findall(r'\bNOT\s+(\S+)', query, re.IGNORECASE)
-    not_match = [t.lower() for t in not_terms]
+    # Build list of stemmed query words (ignore punctuation, short words)
+    raw_words = re.findall(r"[a-zA-Z']+", query)
+    query_stems = [_stem(w) for w in raw_words if len(w) >= 2]
 
-    if not not_match:
-        print(f"[INFO] No local filter applied — returning all {len(profiles)} profiles from LinkedIn search")
+    if not query_stems:
         return profiles
+
+    print(f"[INFO] Filtering for query stems: {query_stems}")
 
     filtered = []
     for profile in profiles:
-        blob = ' '.join([
+        # Combine all text fields available from the Full scrape mode
+        blob = ' '.join(filter(None, [
             profile.get('name', ''),
             profile.get('headline', ''),
+            profile.get('job_title', ''),
             profile.get('company', ''),
             profile.get('about', ''),
             profile.get('skills', ''),
-            profile.get('job_title', ''),
-        ]).lower()
+            profile.get('experience_summary', ''),
+        ])).lower()
 
-        if not any(term in blob for term in not_match):
+        # Stem every word in the blob for comparison
+        blob_words = set(_stem(w) for w in re.findall(r"[a-zA-Z']+", blob) if len(w) >= 2)
+
+        # Profile passes if ALL query stems appear in the blob
+        if all(qs in blob_words for qs in query_stems):
             filtered.append(profile)
 
-    print(f"[INFO] NOT filter: {len(profiles)} -> {len(filtered)} profiles (excluded terms: {not_match})")
+    print(f"[INFO] Query filter: {len(profiles)} → {len(filtered)} profiles matched '{query}'")
     return filtered
 
 

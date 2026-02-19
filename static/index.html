@@ -81,8 +81,10 @@
   .pipeline-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .pipeline-step { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: #b2bec3; font-weight: 500; transition: color 0.3s; }
   .pipeline-step.active { color: #4f6af6; }
-  .pipeline-step.done { color: #00b894; }
-  .step-dot { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; background: #edf0f5; color: #b2bec3; transition: all 0.3s; }
+  .pipeline-step.done { color: #00b894; cursor: pointer; }
+  .pipeline-step.done:hover { color: #00a381; }
+  .pipeline-step.done:hover .step-dot { transform: scale(1.12); box-shadow: 0 2px 8px rgba(0,184,148,0.4); }
+  .step-dot { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; background: #edf0f5; color: #b2bec3; transition: all 0.25s; }
   .pipeline-step.active .step-dot { background: #4f6af6; color: #fff; animation: pulse 1.5s infinite; }
   .pipeline-step.done .step-dot { background: #00b894; color: #fff; }
   .step-line { width: 24px; height: 2px; background: #edf0f5; }
@@ -390,17 +392,17 @@
   <!-- PIPELINE -->
   <div class="pipeline" id="pipeline">
     <div class="pipeline-header">
-      <div class="pipeline-step" id="ps1"><div class="step-dot">1</div> Search</div>
+      <div class="pipeline-step" id="ps1" onclick="onStepClick(1)"><div class="step-dot">1</div> Search</div>
       <div class="step-line" id="sl1"></div>
-      <div class="pipeline-step" id="ps2"><div class="step-dot">2</div> Filter</div>
+      <div class="pipeline-step" id="ps2" onclick="onStepClick(2)"><div class="step-dot">2</div> Filter</div>
       <div class="step-line" id="sl2"></div>
-      <div class="pipeline-step" id="ps3"><div class="step-dot">3</div> Select</div>
+      <div class="pipeline-step" id="ps3" onclick="onStepClick(3)"><div class="step-dot">3</div> Select</div>
       <div class="step-line" id="sl3"></div>
-      <div class="pipeline-step" id="ps4"><div class="step-dot">4</div> Posts</div>
+      <div class="pipeline-step" id="ps4" onclick="onStepClick(4)"><div class="step-dot">4</div> Posts</div>
       <div class="step-line" id="sl4"></div>
-      <div class="pipeline-step" id="ps5"><div class="step-dot">5</div> Analyze</div>
+      <div class="pipeline-step" id="ps5" onclick="onStepClick(5)"><div class="step-dot">5</div> Analyze</div>
       <div class="step-line" id="sl5"></div>
-      <div class="pipeline-step" id="ps6"><div class="step-dot">6</div> Results</div>
+      <div class="pipeline-step" id="ps6" onclick="onStepClick(6)"><div class="step-dot">6</div> Results</div>
     </div>
   </div>
 
@@ -851,6 +853,46 @@
   let lastAnalyzedCount = 0;
   let animQueue = [];
   let isAnimating = false;
+  let selectionData = {with_email: [], without_email: []}; // populated at awaiting_selection
+
+  // ─── PIPELINE STEP NAVIGATION ────────────────────────────
+  function onStepClick(step) {
+    const el = document.getElementById('ps' + step);
+    if (!el.classList.contains('done')) return; // only navigate to completed steps
+
+    // Load selection data from memory or localStorage cache
+    function getSelectionData() {
+      if (selectionData.with_email.length || selectionData.without_email.length) return selectionData;
+      try {
+        const raw = localStorage.getItem('leadIntelSelectionData');
+        if (raw) return JSON.parse(raw);
+      } catch(e) {}
+      return {with_email: [], without_email: []};
+    }
+
+    const sel = document.getElementById('selectionSection');
+    const res = document.getElementById('resultsSection');
+    const scoring = document.getElementById('scoringStage');
+
+    if (step <= 3) {
+      // Steps 1-3: show the filtered profiles / selection view
+      const sd = getSelectionData();
+      if (sd.with_email.length || sd.without_email.length) {
+        res.classList.remove('visible');
+        scoring.classList.remove('visible');
+        renderSelection(sd.with_email, sd.without_email);
+        sel.scrollIntoView({behavior: 'smooth', block: 'start'});
+      }
+    } else {
+      // Steps 4-6: show the final results
+      if (analyzedProfiles.length > 0) {
+        sel.classList.remove('visible');
+        scoring.classList.remove('visible');
+        res.classList.add('visible');
+        res.scrollIntoView({behavior: 'smooth', block: 'start'});
+      }
+    }
+  }
 
   function handleJobUpdate(job) {
     const btn = document.getElementById('searchBtn');
@@ -882,6 +924,9 @@
       clearInterval(pollTimer); pollTimer = null;
       hideStatus();
       setPipeline(3);
+      // Cache selection data so step-click navigation works after refresh
+      selectionData = {with_email: job.profiles_with_email || [], without_email: job.profiles_without_email || []};
+      try { localStorage.setItem('leadIntelSelectionData', JSON.stringify(selectionData)); } catch(e) {}
       renderSelection(job.profiles_with_email, job.profiles_without_email);
       btn.disabled = false; btn.textContent = 'Search';
       return;
@@ -1481,6 +1526,12 @@
     const savedJobId    = localStorage.getItem('leadIntelJobId');
     const savedQuery    = localStorage.getItem('leadIntelSearchQuery');
     const btn           = document.getElementById('searchBtn');
+
+    // Restore selection data so step-click navigation works even after refresh
+    try {
+      const raw = localStorage.getItem('leadIntelSelectionData');
+      if (raw) selectionData = JSON.parse(raw);
+    } catch(e) {}
 
     if (savedJobId) {
       try {

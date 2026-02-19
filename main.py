@@ -350,11 +350,11 @@ async def export_analyzed(job_id: str):
 
 @app.post("/api/chat/{job_id}")
 async def chat_profile(job_id: str, request: Request):
-    """Chat with an AI agent about a specific analyzed profile."""
-    job = jobs.get(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+    """Chat with an AI agent about a specific analyzed profile.
 
+    The frontend sends profile_data in the body so this works even after a
+    Lambda cold start when the in-memory jobs dict has been wiped.
+    """
     body = await request.json()
     linkedin_url = body.get("linkedin_url", "").strip()
     message = body.get("message", "").strip()
@@ -363,10 +363,19 @@ async def chat_profile(job_id: str, request: Request):
     if not message:
         raise HTTPException(status_code=400, detail="message is required")
 
-    all_profiles = job.get("analyzed_profiles", [])
-    profile = next((p for p in all_profiles if p.get("linkedin_url") == linkedin_url), None)
+    # 1) Try in-memory job store (works when Lambda is warm and job exists)
+    profile = None
+    job = jobs.get(job_id)
+    if job:
+        all_profiles = job.get("analyzed_profiles", [])
+        profile = next((p for p in all_profiles if p.get("linkedin_url") == linkedin_url), None)
+
+    # 2) Fallback: use profile_data sent directly from the frontend cache
     if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found in analyzed results")
+        profile = body.get("profile_data")
+
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found — please re-run the analysis")
 
     try:
         reply = chat_with_profile(profile, message, history)
@@ -379,18 +388,27 @@ async def chat_profile(job_id: str, request: Request):
 
 @app.post("/api/draft-email/{job_id}")
 async def draft_email(job_id: str, request: Request):
-    """Generate a personalised outreach email draft for a profile."""
-    job = jobs.get(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+    """Generate a personalised outreach email draft for a profile.
 
+    The frontend sends profile_data in the body so this works even after a
+    Lambda cold start when the in-memory jobs dict has been wiped.
+    """
     body = await request.json()
     linkedin_url = body.get("linkedin_url", "").strip()
 
-    all_profiles = job.get("analyzed_profiles", [])
-    profile = next((p for p in all_profiles if p.get("linkedin_url") == linkedin_url), None)
+    # 1) Try in-memory job store (works when Lambda is warm and job exists)
+    profile = None
+    job = jobs.get(job_id)
+    if job:
+        all_profiles = job.get("analyzed_profiles", [])
+        profile = next((p for p in all_profiles if p.get("linkedin_url") == linkedin_url), None)
+
+    # 2) Fallback: use profile_data sent directly from the frontend cache
     if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        profile = body.get("profile_data")
+
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found — please re-run the analysis")
 
     try:
         draft = draft_outreach_email(profile)

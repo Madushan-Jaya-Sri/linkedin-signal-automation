@@ -1110,10 +1110,11 @@
     btn.innerHTML = `<svg class="spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 019 9"/></svg> Drafting...`;
 
     try {
-      const res = await fetch(`/api/draft-email/${jobId}`, {
+      const res = await fetch(`/api/draft-email/${jobId || 'local'}`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({linkedin_url: p.linkedin_url}),
+        // Send the full profile so the backend can work even after a Lambda cold start
+        body: JSON.stringify({linkedin_url: p.linkedin_url, profile_data: p}),
       });
 
       if (!res.ok) {
@@ -1259,13 +1260,15 @@
     showTyping();
 
     try {
-      const res = await fetch(`/api/chat/${jobId}`, {
+      const res = await fetch(`/api/chat/${jobId || 'local'}`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
+        // Send the full profile so the backend can work even after a Lambda cold start
         body: JSON.stringify({
           linkedin_url: chatCurrentProfile.linkedin_url,
           message,
           history: chatHistory,
+          profile_data: chatCurrentProfile,
         }),
       });
       const data = await res.json();

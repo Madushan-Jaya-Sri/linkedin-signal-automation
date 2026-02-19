@@ -60,7 +60,7 @@ jobs:
             docker run -d \
               --name linkedin-lead-intel \
               --restart unless-stopped \
-              -p 80:8080 \
+              -p 127.0.0.1:8080:8080 \
               --env-file /opt/linkedin-intel/.env \
               905418118598.dkr.ecr.us-east-2.amazonaws.com/linkedin-lead-intel:latest
 

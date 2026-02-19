@@ -1,4 +1,4 @@
-name: Deploy to AWS App Runner
+name: Deploy to EC2
 
 on:
   push:
@@ -38,12 +38,33 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      - name: Trigger App Runner deployment
-        env:
-          SERVICE_ARN: ${{ secrets.APP_RUNNER_SERVICE_ARN }}
-        run: |
-          aws apprunner start-deployment \
-            --service-arn $SERVICE_ARN \
-            --region us-east-2
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key:      ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Login to ECR using instance IAM role
+            aws ecr get-login-password --region us-east-2 \
+              | docker login --username AWS --password-stdin \
+                  905418118598.dkr.ecr.us-east-2.amazonaws.com
 
-          echo "✅ App Runner deployment started for ${{ github.sha }}"
+            # Pull the new image
+            docker pull 905418118598.dkr.ecr.us-east-2.amazonaws.com/linkedin-lead-intel:latest
+
+            # Swap containers with zero manual downtime
+            docker stop linkedin-lead-intel 2>/dev/null || true
+            docker rm   linkedin-lead-intel 2>/dev/null || true
+
+            docker run -d \
+              --name linkedin-lead-intel \
+              --restart unless-stopped \
+              -p 80:8080 \
+              --env-file /opt/linkedin-intel/.env \
+              905418118598.dkr.ecr.us-east-2.amazonaws.com/linkedin-lead-intel:latest
+
+            # Remove dangling images to save disk space
+            docker image prune -f
+
+            echo "✅ Deployed to EC2"

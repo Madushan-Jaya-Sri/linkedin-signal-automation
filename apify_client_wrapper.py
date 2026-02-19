@@ -179,7 +179,8 @@ def scrape_profiles_advanced(params: dict, progress_callback=None) -> list[dict]
     # Build actor input — only include non-empty parameters
     run_input = {
         "searchQuery": params["searchQuery"],
-        "maxItems": params.get("maxItems", 50),
+        # "maxItems": params.get("maxItems", 50),
+        "maxItems":10,
         "profileScraperMode": "Full + email search",
     }
 

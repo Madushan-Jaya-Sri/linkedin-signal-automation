@@ -1,4 +1,3 @@
-import asyncio
 import csv
 import io
 import json
@@ -204,17 +203,10 @@ async def start_search(request: Request):
 
 @app.get("/api/search/progress/{job_id}")
 async def get_progress(job_id: str):
-    """Poll this endpoint to get current job progress.
-
-    Keeps Lambda alive for 3 seconds so the background thread can make progress.
-    """
+    """Poll this endpoint to get current job progress."""
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-
-    # Keep Lambda execution context alive so the background thread can work
-    if job["phase"] not in ("complete", "error", "awaiting_selection"):
-        await asyncio.sleep(3)
 
     return job
 

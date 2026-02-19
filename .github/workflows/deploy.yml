@@ -1,4 +1,4 @@
-name: Deploy to AWS Lambda
+name: Deploy to AWS App Runner
 
 on:
   push:
@@ -38,27 +38,12 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      - name: Deploy to Lambda
+      - name: Trigger App Runner deployment
         env:
-          ECR_REGISTRY:   ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: linkedin-lead-intel
-          IMAGE_TAG:       ${{ github.sha }}
+          SERVICE_ARN: ${{ secrets.APP_RUNNER_SERVICE_ARN }}
         run: |
-          aws lambda update-function-code \
-            --function-name linkedin-lead-intel \
-            --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+          aws apprunner start-deployment \
+            --service-arn $SERVICE_ARN \
             --region us-east-2
 
-          aws lambda wait function-updated \
-            --function-name linkedin-lead-intel \
-            --region us-east-2
-
-          # Lock to 1 concurrent instance so in-memory job state is never split
-          # across containers. uvicorn handles multiple async requests within the
-          # single container, so this does not limit throughput for a single user.
-          aws lambda put-function-concurrency \
-            --function-name linkedin-lead-intel \
-            --reserved-concurrent-executions 1 \
-            --region us-east-2
-
-          echo "✅ Deployed $IMAGE_TAG to linkedin-lead-intel (concurrency=1)"
+          echo "✅ App Runner deployment started for ${{ github.sha }}"

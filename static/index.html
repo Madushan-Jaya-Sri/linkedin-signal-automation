@@ -900,16 +900,9 @@
         renderSelection(sd.with_email, sd.without_email);
         sel.scrollIntoView({behavior: 'smooth', block: 'start'});
 
-        // Show search button always when navigating back
+        // Show both buttons when navigating back - user can run any phase
         searchBtn.style.display = '';
-
-        // Only show floating button if job is still in awaiting_selection phase
-        // If job is complete/error, user must start a new search to run Phase 2 again
-        if (currentJobPhase === 'awaiting_selection') {
-          floatingBtn.classList.add('visible');
-        } else {
-          floatingBtn.classList.remove('visible');
-        }
+        floatingBtn.classList.add('visible');
       }
     } else {
       // Steps 4-6: show the final results
@@ -1118,6 +1111,12 @@
     const urls = Array.from(checked).map(c => c.dataset.url).slice(0, 25);
     if (!urls.length) return;
 
+    // Check if current job is complete - if so, user needs to run a new search first
+    if (currentJobPhase === 'complete' || currentJobPhase === 'error') {
+      alert('This search has already been completed. Please click the "Search" button to start a new search before running Deep Search again.');
+      return;
+    }
+
     document.getElementById('selectionSection').classList.remove('visible');
     document.getElementById('floatingDeepSearch').classList.remove('visible');
     lastPhase = '';
@@ -1131,15 +1130,21 @@
     setPipeline(4);
 
     try {
-      await fetch(`/api/search/${jobId}/select`, {
+      const res = await fetch(`/api/search/${jobId}/select`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({linkedin_urls: urls}),
       });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Failed to start post scraping');
+      }
       startPolling();
     } catch (e) {
       hideStatus();
-      showError('Failed to start post scraping.');
+      document.getElementById('selectionSection').classList.add('visible');
+      document.getElementById('floatingDeepSearch').classList.add('visible');
+      showError(e.message || 'Failed to start post scraping. Please try starting a new search.');
     }
   }
 

@@ -1111,12 +1111,6 @@
     const urls = Array.from(checked).map(c => c.dataset.url).slice(0, 25);
     if (!urls.length) return;
 
-    // Check if current job is complete - if so, user needs to run a new search first
-    if (currentJobPhase === 'complete' || currentJobPhase === 'error') {
-      alert('This search has already been completed. Please click the "Search" button to start a new search before running Deep Search again.');
-      return;
-    }
-
     document.getElementById('selectionSection').classList.remove('visible');
     document.getElementById('floatingDeepSearch').classList.remove('visible');
     lastPhase = '';

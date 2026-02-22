@@ -213,12 +213,16 @@ async def get_progress(job_id: str):
 
 @app.post("/api/search/{job_id}/select")
 async def select_profiles(job_id: str, request: Request):
-    """Submit selected profile URLs to trigger post scraping + analysis."""
+    """Submit selected profile URLs to trigger post scraping + analysis.
+
+    Can be called on jobs in 'awaiting_selection' phase (first time) or 'complete' phase
+    (re-running Phase 2 with different profile selections).
+    """
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    if job["phase"] != "awaiting_selection":
-        raise HTTPException(status_code=400, detail="Job is not awaiting selection")
+    if job["phase"] not in ("awaiting_selection", "complete"):
+        raise HTTPException(status_code=400, detail=f"Cannot start Phase 2 - job is currently in '{job['phase']}' phase")
 
     body = await request.json()
     selected_urls = body.get("linkedin_urls", [])
@@ -227,6 +231,11 @@ async def select_profiles(job_id: str, request: Request):
 
     # Cap at 25 profiles
     selected_urls = selected_urls[:25]
+
+    # Reset analyzed profiles if re-running on completed job
+    if job["phase"] == "complete":
+        job["analyzed_profiles"] = []
+        job["analyzed_count"] = 0
 
     thread = threading.Thread(target=_run_phase2, args=(job_id, selected_urls), daemon=True)
     thread.start()

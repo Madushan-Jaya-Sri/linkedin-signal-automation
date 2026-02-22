@@ -866,6 +866,8 @@
   let lastAnalyzedCount = 0;
   let animQueue = [];
   let isAnimating = false;
+  let animationCounter = 0; // Track animation progress separately
+  let currentJobPhase = ''; // Track current job state
   let selectionData = {with_email: [], without_email: []}; // populated at awaiting_selection
 
   // ─── PIPELINE STEP NAVIGATION ────────────────────────────
@@ -898,9 +900,16 @@
         renderSelection(sd.with_email, sd.without_email);
         sel.scrollIntoView({behavior: 'smooth', block: 'start'});
 
-        // Show both search button and floating button when navigating back to selection
+        // Show search button always when navigating back
         searchBtn.style.display = '';
-        floatingBtn.classList.add('visible');
+
+        // Only show floating button if job is still in awaiting_selection phase
+        // If job is complete/error, user must start a new search to run Phase 2 again
+        if (currentJobPhase === 'awaiting_selection') {
+          floatingBtn.classList.add('visible');
+        } else {
+          floatingBtn.classList.remove('visible');
+        }
       }
     } else {
       // Steps 4-6: show the final results
@@ -983,6 +992,7 @@
         setPipeline(5);
         document.getElementById('scoringStage').classList.add('visible');
         document.getElementById('scoringTitle').textContent = 'Analyzing Profiles';
+        animationCounter = 0; // Reset animation counter
         document.getElementById('scoringCounter').textContent = `0 / ${job.analyzed_total}`;
         showStatus('Analyzing profiles with AI...', 'Building comprehensive insights for each profile');
       }
@@ -1045,20 +1055,20 @@
     }
 
     lastPhase = job.phase;
+    currentJobPhase = job.phase; // Track current job state
   }
 
   async function processAnimQueue(total) {
     if (isAnimating || animQueue.length === 0) return;
     isAnimating = true;
-    let currentCount = total - animQueue.length; // Start from current progress
     while (animQueue.length > 0) {
       const profile = animQueue.shift();
-      currentCount++; // Increment as we process each profile
+      animationCounter++; // Increment animation counter
       const score = profile.analysis?.relevance_score || 0;
-      showSlideCard(profile, currentCount - 1);
+      showSlideCard(profile, animationCounter - 1);
       await new Promise(r => setTimeout(r, 400));
       updateSlideScore(score);
-      document.getElementById('scoringCounter').textContent = `${currentCount} / ${total}`;
+      document.getElementById('scoringCounter').textContent = `${animationCounter} / ${total}`;
       await new Promise(r => setTimeout(r, 1200));
       await slideOut();
     }
@@ -1114,6 +1124,7 @@
     lastAnalyzedCount = 0;
     animQueue = [];
     isAnimating = false;
+    animationCounter = 0; // Reset animation counter for new Phase 2
 
     showStatus('Starting post scraping...', POST_MESSAGES[0]);
     startMessages(POST_MESSAGES);
@@ -1634,12 +1645,14 @@
           document.getElementById('scoringStage').classList.add('visible');
           // Skip animation for already-analyzed profiles — just set the counter
           lastAnalyzedCount = job.analyzed_profiles.length;
+          animationCounter = job.analyzed_profiles.length; // Set animation counter to current progress
           document.getElementById('scoringCounter').textContent =
             `${job.analyzed_profiles.length} / ${job.analyzed_total}`;
           showStatus('Analyzing profiles with AI...', 'Resuming analysis...');
         }
 
         lastPhase = job.phase;
+        currentJobPhase = job.phase; // Track job phase on page load
         startPolling();
         return;
 

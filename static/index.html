@@ -98,6 +98,16 @@
   .status-sub { font-size: 0.8rem; color: #636e72; min-height: 20px; transition: opacity 0.3s; }
   .status-sub.fade { opacity: 0; }
 
+  /* === FLOATING DEEP SEARCH BUTTON === */
+  .floating-deep-search { position: fixed; bottom: 32px; right: 32px; z-index: 200; display: none; }
+  .floating-deep-search.visible { display: block; animation: floatIn 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes floatIn { from { opacity: 0; transform: translateY(20px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .btn-float { background: linear-gradient(135deg, #00b894 0%, #00a381 100%); color: #fff; border: none; border-radius: 50px; padding: 16px 32px; font-size: 0.95rem; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(0,184,148,0.35), 0 0 0 0 rgba(0,184,148,0.4); transition: transform 0.2s, box-shadow 0.2s; animation: floatPulse 2.5s ease-in-out infinite; display: flex; align-items: center; gap: 10px; }
+  .btn-float:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,184,148,0.45), 0 0 0 0 rgba(0,184,148,0); animation: none; }
+  .btn-float:active { transform: translateY(-1px); }
+  .btn-float:disabled { opacity: 0.6; cursor: not-allowed; animation: none; }
+  @keyframes floatPulse { 0%, 100% { box-shadow: 0 8px 24px rgba(0,184,148,0.35), 0 0 0 0 rgba(0,184,148,0.4); } 50% { box-shadow: 0 8px 24px rgba(0,184,148,0.35), 0 0 0 10px rgba(0,184,148,0); } }
+
   /* === SCORING ANIMATION === */
   .scoring-stage { display: none; margin-bottom: 24px; }
   .scoring-stage.visible { display: block; }
@@ -445,11 +455,14 @@
       <div class="select-group-title">Profiles Without Email <span class="badge orange" id="noEmailBadge">0</span></div>
       <div id="noEmailList"></div>
     </div>
+  </div>
 
-    <div class="form-actions">
-      <span style="font-size:0.75rem;color:#b2bec3">Max 25 profiles</span>
-      <button class="btn-primary" id="scrapePostsBtn" onclick="startPostScraping()" disabled>Scrape Posts for Selected (0)</button>
-    </div>
+  <!-- FLOATING DEEP SEARCH BUTTON -->
+  <div class="floating-deep-search" id="floatingDeepSearch">
+    <button class="btn-float" id="deepSearchBtn" onclick="startPostScraping()" disabled>
+      <span>🚀</span>
+      <span id="deepSearchBtnText">Deep Search (0)</span>
+    </button>
   </div>
 
   <!-- FINAL RESULTS -->
@@ -872,6 +885,8 @@
 
     const sel = document.getElementById('selectionSection');
     const res = document.getElementById('resultsSection');
+    const searchBtn = document.getElementById('searchBtn');
+    const floatingBtn = document.getElementById('floatingDeepSearch');
     const scoring = document.getElementById('scoringStage');
 
     if (step <= 3) {
@@ -882,6 +897,10 @@
         scoring.classList.remove('visible');
         renderSelection(sd.with_email, sd.without_email);
         sel.scrollIntoView({behavior: 'smooth', block: 'start'});
+
+        // Show both search button and floating button when navigating back to selection
+        searchBtn.style.display = '';
+        floatingBtn.classList.add('visible');
       }
     } else {
       // Steps 4-6: show the final results
@@ -890,6 +909,10 @@
         scoring.classList.remove('visible');
         res.classList.add('visible');
         res.scrollIntoView({behavior: 'smooth', block: 'start'});
+
+        // Hide floating button in results view
+        floatingBtn.classList.remove('visible');
+        searchBtn.style.display = '';
       }
     }
   }
@@ -901,7 +924,10 @@
       clearInterval(pollTimer); pollTimer = null;
       localStorage.removeItem('leadIntelJobId');
       hideStatus(); showError(job.error);
-      btn.disabled = false; btn.textContent = 'Search';
+      btn.style.display = '';
+      btn.disabled = false;
+      btn.textContent = 'Search';
+      document.getElementById('floatingDeepSearch').classList.remove('visible');
       return;
     }
 
@@ -928,7 +954,11 @@
       selectionData = {with_email: job.profiles_with_email || [], without_email: job.profiles_without_email || []};
       try { localStorage.setItem('leadIntelSelectionData', JSON.stringify(selectionData)); } catch(e) {}
       renderSelection(job.profiles_with_email, job.profiles_without_email);
-      btn.disabled = false; btn.textContent = 'Search';
+
+      // Hide search button, show floating Deep Search button
+      btn.style.display = 'none';
+      document.getElementById('floatingDeepSearch').classList.add('visible');
+
       return;
     }
 
@@ -938,6 +968,10 @@
         setPipeline(4);
         showStatus(`Scraping posts: ${job.posts_scraped} / ${job.posts_total}`, POST_MESSAGES[0]);
         startMessages(POST_MESSAGES);
+
+        // Hide floating button and selection section when deep search starts
+        document.getElementById('floatingDeepSearch').classList.remove('visible');
+        document.getElementById('selectionSection').classList.remove('visible');
       } else {
         document.getElementById('statusMain').textContent = `Scraping posts: ${job.posts_scraped} / ${job.posts_total}` + (job.current_profile_name ? ` — ${job.current_profile_name}` : '');
       }
@@ -1002,7 +1036,11 @@
           } catch (_) { /* storage unavailable — results won't persist across refresh */ }
         }
 
-        btn.disabled = false; btn.textContent = 'Search';
+        // Restore search button, hide floating button
+        btn.style.display = '';
+        btn.disabled = false;
+        btn.textContent = 'Search';
+        document.getElementById('floatingDeepSearch').classList.remove('visible');
       });
     }
 
@@ -1012,13 +1050,15 @@
   async function processAnimQueue(total) {
     if (isAnimating || animQueue.length === 0) return;
     isAnimating = true;
+    let currentCount = total - animQueue.length; // Start from current progress
     while (animQueue.length > 0) {
       const profile = animQueue.shift();
+      currentCount++; // Increment as we process each profile
       const score = profile.analysis?.relevance_score || 0;
-      showSlideCard(profile, total - animQueue.length - 1);
+      showSlideCard(profile, currentCount - 1);
       await new Promise(r => setTimeout(r, 400));
       updateSlideScore(score);
-      document.getElementById('scoringCounter').textContent = `${total - animQueue.length} / ${total}`;
+      document.getElementById('scoringCounter').textContent = `${currentCount} / ${total}`;
       await new Promise(r => setTimeout(r, 1200));
       await slideOut();
     }
@@ -1048,10 +1088,13 @@
     const checked = document.querySelectorAll('#selectionSection input[type="checkbox"]:checked');
     const count = checked.length;
     document.getElementById('selectedCount').textContent = `${count} selected`;
-    const btn = document.getElementById('scrapePostsBtn');
-    btn.textContent = `Scrape Posts for Selected (${count})`;
-    btn.disabled = count === 0;
-    if (count > 25) btn.textContent += ' — max 25!';
+
+    // Update floating Deep Search button
+    const deepBtn = document.getElementById('deepSearchBtn');
+    const deepBtnText = document.getElementById('deepSearchBtnText');
+    deepBtnText.textContent = `Deep Search (${count})`;
+    deepBtn.disabled = count === 0;
+    if (count > 25) deepBtnText.textContent += ' — max 25!';
   }
   function toggleSelectAll() {
     const boxes = document.querySelectorAll('#selectionSection input[type="checkbox"]');
@@ -1066,6 +1109,7 @@
     if (!urls.length) return;
 
     document.getElementById('selectionSection').classList.remove('visible');
+    document.getElementById('floatingDeepSearch').classList.remove('visible');
     lastPhase = '';
     lastAnalyzedCount = 0;
     animQueue = [];
@@ -1552,12 +1596,19 @@
         if (job.phase === 'error') {
           localStorage.removeItem('leadIntelJobId');
           showError(job.error);
+          btn.style.display = '';
+          document.getElementById('floatingDeepSearch').classList.remove('visible');
           return;
         }
 
         if (job.phase === 'awaiting_selection') {
           setPipeline(3);
           renderSelection(job.profiles_with_email, job.profiles_without_email);
+
+          // Hide search button, show floating Deep Search button
+          btn.style.display = 'none';
+          document.getElementById('floatingDeepSearch').classList.add('visible');
+
           return;
         }
 
@@ -1576,7 +1627,9 @@
           setPipeline(4);
           showStatus(`Scraping posts: ${job.posts_scraped} / ${job.posts_total}`, POST_MESSAGES[0]);
           startMessages(POST_MESSAGES);
+          document.getElementById('floatingDeepSearch').classList.remove('visible');
         } else if (job.phase === 'analyzing') {
+          document.getElementById('floatingDeepSearch').classList.remove('visible');
           setPipeline(5);
           document.getElementById('scoringStage').classList.add('visible');
           // Skip animation for already-analyzed profiles — just set the counter

@@ -6,9 +6,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # ─── Outreach Sender Config ────────────────────────────────────
 # Update these to match the user running the tool
-SENDER_NAME    = os.getenv("SENDER_NAME",    "Madushan Jayasri")
-SENDER_EMAIL   = os.getenv("SENDER_EMAIL",   "madushan.jayasri@momentro.com")
-COMPANY_NAME   = os.getenv("COMPANY_NAME",   "Momentro")
+SENDER_NAME    = os.getenv("SENDER_NAME",    "[Your Name]")
+SENDER_EMAIL   = os.getenv("SENDER_EMAIL",   "")
+COMPANY_NAME   = os.getenv("COMPANY_NAME",   "[Your Company]")
 COMPANY_PITCH  = os.getenv("COMPANY_PITCH",  (
     "an AI-driven marketing agency that delivers end-to-end AI-powered marketing strategies — "
     "from intelligent campaign automation and content generation to data-driven audience targeting "

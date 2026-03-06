@@ -1,17 +1,24 @@
 import csv
 import io
 import json
+import os
 import threading
 import uuid
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
+from jose import JWTError, jwt
+import bcrypt as _bcrypt
+from pymongo import MongoClient
+from pymongo.errors import DuplicateKeyError
 
 from apify_client_wrapper import scrape_profiles_advanced, scrape_posts, filter_profiles
 from scorer import analyze_profile, chat_with_profile, draft_outreach_email
@@ -26,7 +33,118 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Job store for multi-phase search
+# ─── MongoDB Setup ─────────────────────────────────────────────
+_mongo_uri = os.getenv("MONGO_CONNECTION_STRING", "")
+db = None
+
+if _mongo_uri:
+    try:
+        _mongo_client = MongoClient(_mongo_uri, serverSelectionTimeoutMS=5000)
+        _mongo_client.admin.command("ping")
+        db = _mongo_client["linkedin_intel"]
+        db.users.create_index("email", unique=True)
+        print("[DB] MongoDB connected")
+    except Exception as e:
+        print(f"[DB] MongoDB connection failed: {e}")
+        db = None
+
+# ─── Auth Setup ────────────────────────────────────────────────
+SECRET_KEY = os.getenv("JWT_SECRET", "linkedin-intel-dev-secret-change-in-prod")
+ALGORITHM = "HS256"
+TOKEN_EXPIRE_DAYS = 7
+
+security_scheme = HTTPBearer()
+
+
+def hash_password(password: str) -> str:
+    return _bcrypt.hashpw(password.encode(), _bcrypt.gensalt()).decode()
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return _bcrypt.checkpw(plain.encode(), hashed.encode())
+
+
+def create_token(email: str) -> str:
+    expire = datetime.utcnow() + timedelta(days=TOKEN_EXPIRE_DAYS)
+    return jwt.encode({"sub": email, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security_scheme)) -> dict:
+    try:
+        payload = jwt.decode(creds.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if not email:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return {"email": email}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+
+# ─── Auth Endpoints ────────────────────────────────────────────
+
+@app.post("/api/auth/signup")
+async def signup(request: Request):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    body = await request.json()
+    name = body.get("name", "").strip()
+    email = body.get("email", "").strip().lower()
+    password = body.get("password", "")
+    if not name or not email or not password:
+        raise HTTPException(status_code=400, detail="Name, email and password are required")
+    try:
+        db.users.insert_one({
+            "name": name,
+            "email": email,
+            "password": hash_password(password),
+            "created_at": datetime.utcnow(),
+        })
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="Email already registered")
+    token = create_token(email)
+    return {"token": token, "name": name, "email": email}
+
+
+@app.post("/api/auth/signin")
+async def signin(request: Request):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    body = await request.json()
+    email = body.get("email", "").strip().lower()
+    password = body.get("password", "")
+    user = db.users.find_one({"email": email})
+    if not user or not verify_password(password, user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    token = create_token(email)
+    return {"token": token, "name": user["name"], "email": email}
+
+
+# ─── MongoDB Cycle Save ────────────────────────────────────────
+
+def save_cycle_to_db(job: dict):
+    """Save a completed search cycle to MongoDB (posts stripped to reduce doc size)."""
+    if db is None:
+        return
+    user_email = job.get("user_email")
+    if not user_email:
+        return
+    try:
+        profiles_for_db = list(job.get("analyzed_profiles", []))
+        db.cycles.insert_one({
+            "user_email": user_email,
+            "search_query": job.get("search_query", ""),
+            "completed_at": datetime.utcnow(),
+            "profiles_with_email_count": len(job.get("profiles_with_email", [])),
+            "profiles_without_email_count": len(job.get("profiles_without_email", [])),
+            "analyzed_count": len(profiles_for_db),
+            "analyzed_profiles": profiles_for_db,
+        })
+        print(f"[DB] Saved cycle for {user_email} — {len(profiles_for_db)} profiles")
+    except Exception as e:
+        print(f"[DB] Failed to save cycle: {e}")
+
+
+# ─── Job store ────────────────────────────────────────────────
 jobs: dict[str, dict] = {}
 
 
@@ -45,8 +163,6 @@ def _run_phase1(job_id: str, search_params: dict):
     """Background thread: Apify advanced search → local filter → split by email."""
     job = jobs[job_id]
 
-    # Step 1: Scrape — progress_callback updates profiles_found in real-time
-    # so the frontend shows a live download counter instead of a frozen spinner.
     job["phase"] = "scraping"
     job["scrape_status"] = "running_actor"
     try:
@@ -63,7 +179,6 @@ def _run_phase1(job_id: str, search_params: dict):
     job["profiles_found"] = len(raw_profiles)
     job["scrape_status"] = "done"
 
-    # Step 2: Filter (only NOT exclusions — LinkedIn already matched positive terms)
     job["phase"] = "filtering"
     filtered = filter_profiles(raw_profiles, search_params["searchQuery"])
     job["profiles_filtered"] = len(filtered)
@@ -78,7 +193,6 @@ def _run_phase1(job_id: str, search_params: dict):
         )
         return
 
-    # Split by email presence
     with_email = [p for p in filtered if p.get("email")]
     without_email = [p for p in filtered if not p.get("email")]
 
@@ -93,7 +207,6 @@ def _run_phase2(job_id: str, selected_urls: list[str]):
     """Background thread: Scrape posts for selected → LLM analysis for each."""
     job = jobs[job_id]
 
-    # Gather selected profiles from both lists
     all_profiles = job["profiles_with_email"] + job["profiles_without_email"]
     selected = [p for p in all_profiles if p["linkedin_url"] in selected_urls]
 
@@ -151,9 +264,11 @@ def _run_phase2(job_id: str, selected_urls: list[str]):
         job["analyzed_profiles"].append(profile)
         job["analyzed_count"] = i + 1
 
-    # Sort by relevance score
     job["analyzed_profiles"].sort(key=lambda x: x.get("analysis", {}).get("relevance_score", 0), reverse=True)
     job["phase"] = "complete"
+
+    # Persist completed cycle to MongoDB
+    save_cycle_to_db(job)
 
 
 # ─── Endpoints ────────────────────────────────────────────────
@@ -164,8 +279,8 @@ async def serve_index():
 
 
 @app.post("/api/search/start")
-async def start_search(request: Request):
-    """Start a search job with advanced parameters. Returns job_id for polling."""
+async def start_search(request: Request, user: dict = Depends(get_current_user)):
+    """Start a search job. Requires valid JWT token."""
     import time
     _cleanup_old_jobs()
 
@@ -174,12 +289,14 @@ async def start_search(request: Request):
     if not search_query:
         raise HTTPException(status_code=400, detail="searchQuery is required")
 
-    params["maxItems"] = max(int(params.get("maxItems", 50)), 50)
+    # Always cap at 50 profiles
+    params["maxItems"] = 50
 
     job_id = str(uuid.uuid4())[:8]
     jobs[job_id] = {
         "phase": "starting",
         "created_at": time.time(),
+        "user_email": user["email"],
         "search_query": search_query,
         "search_params": params,
         "profiles_found": 0,
@@ -203,36 +320,32 @@ async def start_search(request: Request):
 
 @app.get("/api/search/progress/{job_id}")
 async def get_progress(job_id: str):
-    """Poll this endpoint to get current job progress."""
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-
     return job
 
 
 @app.post("/api/search/{job_id}/select")
-async def select_profiles(job_id: str, request: Request):
+async def select_profiles(job_id: str, request: Request, user: dict = Depends(get_current_user)):
     """Submit selected profile URLs to trigger post scraping + analysis.
 
-    Can be called on jobs in 'awaiting_selection' phase (first time) or 'complete' phase
-    (re-running Phase 2 with different profile selections).
+    Accepted in both 'awaiting_selection' and 'complete' phases so user can
+    re-run Phase 2 with a different selection without starting a new search.
     """
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     if job["phase"] not in ("awaiting_selection", "complete"):
-        raise HTTPException(status_code=400, detail=f"Cannot start Phase 2 - job is currently in '{job['phase']}' phase")
+        raise HTTPException(status_code=400, detail=f"Cannot start Phase 2 — job is in '{job['phase']}' phase")
 
     body = await request.json()
     selected_urls = body.get("linkedin_urls", [])
     if not selected_urls:
         raise HTTPException(status_code=400, detail="No profiles selected")
 
-    # Cap at 25 profiles
     selected_urls = selected_urls[:25]
 
-    # Reset analyzed profiles if re-running on completed job
     if job["phase"] == "complete":
         job["analyzed_profiles"] = []
         job["analyzed_count"] = 0
@@ -243,84 +356,59 @@ async def select_profiles(job_id: str, request: Request):
     return {"status": "started", "selected_count": len(selected_urls)}
 
 
-# ─── CSV Export Endpoints ─────────────────────────────────────
+# ─── CSV Export ───────────────────────────────────────────────
 
 def _build_profile_csv(profiles: list[dict], filename: str):
-    """Build CSV from profile dicts (before analysis)."""
     if not profiles:
         raise HTTPException(status_code=404, detail="No profiles to export.")
-
     output = io.StringIO()
-    fieldnames = [
-        "Name", "Headline", "Company", "Country", "City",
-        "Email", "LinkedIn URL", "Connections", "Followers", "Hiring",
-    ]
+    fieldnames = ["Name", "Headline", "Company", "Country", "City", "Email", "LinkedIn URL", "Connections", "Followers", "Hiring"]
     writer = csv.DictWriter(output, fieldnames=fieldnames)
     writer.writeheader()
     for p in profiles:
         writer.writerow({
-            "Name": p.get("name", ""),
-            "Headline": p.get("headline", ""),
-            "Company": p.get("company", ""),
-            "Country": p.get("country", ""),
-            "City": p.get("city", ""),
-            "Email": p.get("email", ""),
-            "LinkedIn URL": p.get("linkedin_url", ""),
-            "Connections": p.get("connections", 0),
-            "Followers": p.get("followers", 0),
-            "Hiring": "Yes" if p.get("is_hiring") else "No",
+            "Name": p.get("name", ""), "Headline": p.get("headline", ""),
+            "Company": p.get("company", ""), "Country": p.get("country", ""),
+            "City": p.get("city", ""), "Email": p.get("email", ""),
+            "LinkedIn URL": p.get("linkedin_url", ""), "Connections": p.get("connections", 0),
+            "Followers": p.get("followers", 0), "Hiring": "Yes" if p.get("is_hiring") else "No",
         })
     output.seek(0)
-    return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv",
+                             headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
 def _build_analyzed_csv(profiles: list[dict], filename: str):
-    """Build CSV from analyzed profile dicts (with analysis + posts summary)."""
     if not profiles:
         raise HTTPException(status_code=404, detail="No analyzed profiles to export.")
-
     output = io.StringIO()
     fieldnames = [
-        "Name", "Headline", "Company", "Country", "City",
-        "Email", "LinkedIn URL", "Connections", "Followers", "Hiring",
-        "Relevance Score", "Activity Level", "Key Topics",
-        "Areas of Interest", "Recent Activity Summary",
+        "Name", "Headline", "Company", "Country", "City", "Email", "LinkedIn URL",
+        "Connections", "Followers", "Hiring", "Relevance Score", "Activity Level",
+        "Key Topics", "Areas of Interest", "Recent Activity Summary",
         "Engagement Metrics", "Recommendation", "Reasoning",
     ]
     writer = csv.DictWriter(output, fieldnames=fieldnames)
     writer.writeheader()
     for p in profiles:
-        analysis = p.get("analysis", {})
+        a = p.get("analysis", {})
         writer.writerow({
-            "Name": p.get("name", ""),
-            "Headline": p.get("headline", ""),
-            "Company": p.get("company", ""),
-            "Country": p.get("country", ""),
-            "City": p.get("city", ""),
-            "Email": p.get("email", ""),
-            "LinkedIn URL": p.get("linkedin_url", ""),
-            "Connections": p.get("connections", 0),
-            "Followers": p.get("followers", 0),
-            "Hiring": "Yes" if p.get("is_hiring") else "No",
-            "Relevance Score": analysis.get("relevance_score", 0),
-            "Activity Level": analysis.get("activity_level", ""),
-            "Key Topics": "; ".join(analysis.get("key_topics", [])),
-            "Areas of Interest": "; ".join(analysis.get("areas_of_interest", [])),
-            "Recent Activity Summary": analysis.get("recent_activity_summary", ""),
-            "Engagement Metrics": analysis.get("engagement_metrics", ""),
-            "Recommendation": analysis.get("recommendation", ""),
-            "Reasoning": analysis.get("reasoning", ""),
+            "Name": p.get("name", ""), "Headline": p.get("headline", ""),
+            "Company": p.get("company", ""), "Country": p.get("country", ""),
+            "City": p.get("city", ""), "Email": p.get("email", ""),
+            "LinkedIn URL": p.get("linkedin_url", ""), "Connections": p.get("connections", 0),
+            "Followers": p.get("followers", 0), "Hiring": "Yes" if p.get("is_hiring") else "No",
+            "Relevance Score": a.get("relevance_score", 0), "Activity Level": a.get("activity_level", ""),
+            "Key Topics": "; ".join(a.get("key_topics", [])),
+            "Areas of Interest": "; ".join(a.get("areas_of_interest", [])),
+            "Recent Activity Summary": a.get("recent_activity_summary", ""),
+            "Engagement Metrics": a.get("engagement_metrics", ""),
+            "Recommendation": a.get("recommendation", ""),
+            "Reasoning": a.get("reasoning", ""),
         })
     output.seek(0)
-    return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv",
+                             headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
 @app.get("/api/export/with-email/{job_id}")
@@ -347,34 +435,23 @@ async def export_analyzed(job_id: str):
     return _build_analyzed_csv(job["analyzed_profiles"], "analyzed_profiles.csv")
 
 
-# ─── Profile Chat Endpoint ────────────────────────────────────
+# ─── Profile Chat ─────────────────────────────────────────────
 
 @app.post("/api/chat/{job_id}")
-async def chat_profile(job_id: str, request: Request):
-    """Chat with an AI agent about a specific analyzed profile.
-
-    The frontend sends profile_data in the body so this works even after a
-    Lambda cold start when the in-memory jobs dict has been wiped.
-    """
+async def chat_profile(job_id: str, request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
     linkedin_url = body.get("linkedin_url", "").strip()
     message = body.get("message", "").strip()
     history = body.get("history", [])
-
     if not message:
         raise HTTPException(status_code=400, detail="message is required")
 
-    # 1) Try in-memory job store (works when Lambda is warm and job exists)
     profile = None
     job = jobs.get(job_id)
     if job:
-        all_profiles = job.get("analyzed_profiles", [])
-        profile = next((p for p in all_profiles if p.get("linkedin_url") == linkedin_url), None)
-
-    # 2) Fallback: use profile_data sent directly from the frontend cache
+        profile = next((p for p in job.get("analyzed_profiles", []) if p.get("linkedin_url") == linkedin_url), None)
     if not profile:
         profile = body.get("profile_data")
-
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found — please re-run the analysis")
 
@@ -385,29 +462,19 @@ async def chat_profile(job_id: str, request: Request):
         raise HTTPException(status_code=500, detail=f"Chat failed: {e}")
 
 
-# ─── Outreach Email Draft Endpoint ────────────────────────────
+# ─── Outreach Email ───────────────────────────────────────────
 
 @app.post("/api/draft-email/{job_id}")
-async def draft_email(job_id: str, request: Request):
-    """Generate a personalised outreach email draft for a profile.
-
-    The frontend sends profile_data in the body so this works even after a
-    Lambda cold start when the in-memory jobs dict has been wiped.
-    """
+async def draft_email(job_id: str, request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
     linkedin_url = body.get("linkedin_url", "").strip()
 
-    # 1) Try in-memory job store (works when Lambda is warm and job exists)
     profile = None
     job = jobs.get(job_id)
     if job:
-        all_profiles = job.get("analyzed_profiles", [])
-        profile = next((p for p in all_profiles if p.get("linkedin_url") == linkedin_url), None)
-
-    # 2) Fallback: use profile_data sent directly from the frontend cache
+        profile = next((p for p in job.get("analyzed_profiles", []) if p.get("linkedin_url") == linkedin_url), None)
     if not profile:
         profile = body.get("profile_data")
-
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found — please re-run the analysis")
 
@@ -418,19 +485,51 @@ async def draft_email(job_id: str, request: Request):
         raise HTTPException(status_code=500, detail=f"Email draft failed: {e}")
 
 
+# ─── History Endpoints ───────────────────────────────────────
+
+@app.get("/api/history")
+async def get_history(user: dict = Depends(get_current_user)):
+    """Return summary list of past cycles for the current user (newest first)."""
+    if db is None:
+        return []
+    from bson import ObjectId
+    cycles = list(db.cycles.find(
+        {"user_email": user["email"]},
+        {"_id": 1, "search_query": 1, "completed_at": 1,
+         "analyzed_count": 1, "profiles_with_email_count": 1,
+         "profiles_without_email_count": 1}
+    ).sort("completed_at", -1).limit(50))
+    for c in cycles:
+        c["_id"] = str(c["_id"])
+    return cycles
+
+
+@app.get("/api/history/{cycle_id}")
+async def get_history_cycle(cycle_id: str, user: dict = Depends(get_current_user)):
+    """Return full analyzed profiles for a specific past cycle."""
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    from bson import ObjectId
+    try:
+        oid = ObjectId(cycle_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid cycle ID")
+    cycle = db.cycles.find_one({"_id": oid, "user_email": user["email"]})
+    if not cycle:
+        raise HTTPException(status_code=404, detail="Cycle not found")
+    cycle["_id"] = str(cycle["_id"])
+    return cycle
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 if __name__ == "__main__":
     import uvicorn
     print("\n" + "=" * 60)
-    print("  LinkedIn Lead Intelligence v2")
-    print("  Advanced Search + Post Analysis + AI Scoring")
+    print("  LinkedIn Lead Intelligence")
     print("=" * 60)
-    print("\n  Server starting at: http://localhost:8000")
-    print("  API docs at:        http://localhost:8000/docs")
-    print("\n  Make sure your .env file has:")
-    print("    APIFY_API_TOKEN=your_token")
-    print("    OPENAI_API_KEY=your_key")
+    print("\n  Server: http://localhost:8000")
+    print("  API docs: http://localhost:8000/docs")
     print("=" * 60 + "\n")
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -5,3 +5,6 @@ openai
 python-dotenv
 pydantic
 httpx
+pymongo
+bcrypt
+python-jose[cryptography]

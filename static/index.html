@@ -9,14 +9,24 @@
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #2d3436; min-height: 100vh; }
   .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
 
-  /* === HEADER === */
-  header { text-align: center; padding: 40px 0 28px; }
-  .header-title { display: inline-flex; align-items: center; gap: 12px; }
-  .li-icon { width: 36px; height: 36px; border-radius: 8px; background: #0077b5; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,119,181,0.35); }
+  /* === HEADER / BANNER === */
+  @keyframes bannerShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+  @keyframes shimmer { 0% { background-position: 0% center; } 100% { background-position: 200% center; } }
+  .site-banner { background: linear-gradient(120deg, #0a1628, #0d2244, #0a3d7a, #0077b5, #005fa3, #1a2f6b, #0a1628); background-size: 320% 320%; animation: bannerShift 12s ease infinite; padding: 0; margin-bottom: 28px; border-radius: 20px; overflow: hidden; position: relative; box-shadow: 0 8px 36px rgba(0,55,120,0.28), 0 2px 8px rgba(0,0,0,0.14); }
+  .site-banner::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 65% 70% at 80% 50%, rgba(56,189,248,0.10) 0%, transparent 65%), radial-gradient(ellipse 45% 55% at 5% 80%, rgba(129,140,248,0.10) 0%, transparent 60%); pointer-events: none; }
+  .banner-grid { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 24px; padding: 28px 36px; position: relative; z-index: 1; }
+  .banner-left { display: flex; flex-direction: column; gap: 6px; }
+  .banner-eyebrow { font-size: 0.68rem; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 2px; display: flex; align-items: center; gap: 8px; }
+  .banner-eyebrow::before { content: ''; display: inline-block; width: 22px; height: 1.5px; background: rgba(255,255,255,0.25); border-radius: 2px; }
+  .banner-headline { font-size: 2.15rem; font-weight: 800; letter-spacing: -0.8px; line-height: 1.1; background: linear-gradient(100deg, #ffffff 0%, #bfdbfe 40%, #e0e7ff 65%, #ffffff 100%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: shimmer 6s linear infinite; }
+  .banner-sub { font-size: 0.88rem; color: rgba(255,255,255,0.48); font-weight: 400; line-height: 1.55; margin-top: 4px; letter-spacing: 0.1px; }
+  .banner-sub strong { color: rgba(255,255,255,0.78); font-weight: 600; }
+  .banner-right { display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
+  .banner-logo { display: flex; align-items: center; gap: 9px; }
+  .li-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(0,119,181,0.9); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 14px rgba(0,119,181,0.55), 0 0 0 1px rgba(255,255,255,0.1); }
   .li-icon svg { display: block; }
-  header h1 { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(90deg, #0077b5 0%, #00a0dc 30%, #0077b5 60%, #004182 85%, #0077b5 100%); background-size: 250% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: liGradient 4s linear infinite; }
-  @keyframes liGradient { 0% { background-position: 0% center; } 100% { background-position: 250% center; } }
-  header p { color: #636e72; font-size: 0.95rem; margin-top: 6px; }
+  .banner-logo-text { font-size: 0.72rem; font-weight: 700; color: rgba(255,255,255,0.4); letter-spacing: 1.2px; text-transform: uppercase; }
+  .user-bar-wrap { display: flex; align-items: center; gap: 8px; }
 
   /* === FORM === */
   .search-form { background: #fff; border: 1px solid #e0e3ea; border-radius: 14px; padding: 24px 28px; margin-bottom: 28px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
@@ -280,6 +290,28 @@
   .footer-copy { font-size: 0.7rem; color: #b2bec3; }
   .footer-copy strong { color: #636e72; font-weight: 600; }
 
+  /* === HISTORY PANEL === */
+  .history-panel { position: fixed; inset: 0; z-index: 400; display: none; }
+  .history-panel.open { display: block; }
+  .hp-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.35); backdrop-filter: blur(2px); }
+  .hp-inner { position: absolute; right: 0; top: 0; bottom: 0; width: 420px; max-width: 96vw; background: #fff; box-shadow: -6px 0 32px rgba(0,0,0,0.14); display: flex; flex-direction: column; animation: ppSlideIn 0.22s ease-out; }
+  .hp-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 14px; border-bottom: 1px solid #e0e3ea; flex-shrink: 0; }
+  .hp-title { font-size: 1rem; font-weight: 700; color: #1a1a2e; }
+  .hp-close { background: none; border: none; font-size: 1.5rem; color: #b2bec3; cursor: pointer; padding: 2px 8px; border-radius: 6px; line-height: 1; }
+  .hp-close:hover { background: #f0f2f5; color: #636e72; }
+  .hp-body { flex: 1; overflow-y: auto; padding: 14px; }
+  .hp-empty { text-align: center; padding: 50px 20px; color: #b2bec3; font-size: 0.85rem; }
+  .hp-item { background: #fff; border: 1.5px solid #e0e3ea; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+  .hp-item:hover { border-color: #4f6af6; box-shadow: 0 3px 14px rgba(79,106,246,0.12); }
+  .hp-query { font-size: 0.88rem; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hp-meta { font-size: 0.72rem; color: #b2bec3; margin-bottom: 8px; }
+  .hp-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .hp-badge { background: #f0f4ff; color: #4f6af6; font-size: 0.68rem; font-weight: 600; padding: 2px 9px; border-radius: 10px; }
+  .hp-badge.green { background: #e8f8f5; color: #00b894; }
+  .hp-loading { text-align: center; padding: 30px; color: #b2bec3; font-size: 0.85rem; }
+  .btn-history { background: rgba(79,106,246,0.18); border: 1px solid rgba(79,106,246,0.4); border-radius: 8px; padding: 5px 13px; font-size: 0.75rem; color: #a5b4fc; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .btn-history:hover { background: rgba(79,106,246,0.32); border-color: rgba(79,106,246,0.7); color: #c7d2fe; }
+
   /* === POST PANEL === */
   .post-panel { position: fixed; inset: 0; z-index: 300; display: none; }
   .post-panel.open { display: block; }
@@ -326,19 +358,127 @@
     .adv-grid { grid-template-columns: 1fr; }
     .result-top { flex-direction: column; }
   }
+
+  /* === AUTH OVERLAY === */
+  .auth-overlay { position: fixed; inset: 0; z-index: 1000; background: linear-gradient(135deg, #f0f4ff 0%, #e8f5e9 100%); display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .auth-card { background: #fff; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.12); width: 100%; max-width: 420px; padding: 40px 36px; }
+  .auth-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+  .auth-logo-icon { width: 36px; height: 36px; background: #0077b5; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .auth-logo-title { font-size: 1.1rem; font-weight: 700; color: #1a1a2e; }
+  .auth-logo-sub { font-size: 0.7rem; color: #b2bec3; margin-top: 1px; }
+  .auth-tabs { display: flex; background: #f0f2f5; border-radius: 10px; padding: 4px; margin-bottom: 28px; }
+  .auth-tab { flex: 1; background: none; border: none; border-radius: 8px; padding: 9px; font-size: 0.85rem; font-weight: 600; color: #636e72; cursor: pointer; transition: all 0.2s; }
+  .auth-tab.active { background: #fff; color: #1a1a2e; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+  .auth-field { margin-bottom: 18px; }
+  .auth-field label { display: block; font-size: 0.8rem; font-weight: 600; color: #2d3436; margin-bottom: 6px; }
+  .auth-input { width: 100%; padding: 11px 14px; border: 1.5px solid #e0e3ea; border-radius: 10px; font-size: 0.88rem; font-family: inherit; outline: none; transition: border-color 0.15s, box-shadow 0.15s; box-sizing: border-box; }
+  .auth-input:focus { border-color: #4f6af6; box-shadow: 0 0 0 3px rgba(79,106,246,0.12); }
+  .auth-input.error { border-color: #e17055; }
+  .auth-err { display: block; font-size: 0.73rem; color: #e17055; margin-top: 4px; min-height: 16px; }
+  .auth-form-err { background: #fde8e8; color: #e17055; border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; margin-bottom: 16px; display: none; }
+  .auth-form-err.visible { display: block; }
+  .btn-auth { width: 100%; padding: 13px; background: linear-gradient(135deg, #4f6af6 0%, #6c5ce7 100%); color: #fff; border: none; border-radius: 10px; font-size: 0.92rem; font-weight: 700; cursor: pointer; transition: opacity 0.15s, transform 0.1s; margin-top: 4px; }
+  .btn-auth:hover { opacity: 0.92; transform: translateY(-1px); }
+  .btn-auth:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+  /* === USER BAR === */
+  .user-bar { display: flex; align-items: center; gap: 8px; }
+  .user-greeting { font-size: 0.78rem; color: rgba(255,255,255,0.65); font-weight: 500; }
+  .btn-logout { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; padding: 5px 13px; font-size: 0.75rem; color: rgba(255,255,255,0.7); cursor: pointer; transition: all 0.15s; font-weight: 500; }
+  .btn-logout:hover { background: rgba(231,76,60,0.25); color: #ff7675; border-color: rgba(231,76,60,0.4); }
 </style>
 </head>
 <body>
-<div class="container">
-  <header>
-    <div class="header-title">
-      <div class="li-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zm2-3a2 2 0 100-4 2 2 0 000 4z"/></svg>
+
+<!-- AUTH OVERLAY -->
+<div id="authOverlay" class="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zm2-3a2 2 0 100-4 2 2 0 000 4z"/></svg>
       </div>
-      <h1>LinkedIn Lead Intelligence</h1>
+      <div>
+        <div class="auth-logo-title">LinkedIn Lead Intelligence</div>
+        <div class="auth-logo-sub">Find, filter & analyze the right prospects</div>
+      </div>
     </div>
-    <p>Find, filter, and analyze the right prospects</p>
-  </header>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="signinTab" onclick="switchAuthTab('signin')">Sign In</button>
+      <button class="auth-tab" id="signupTab" onclick="switchAuthTab('signup')">Sign Up</button>
+    </div>
+
+    <!-- SIGN IN -->
+    <div id="signinForm">
+      <div class="auth-field">
+        <label>Email</label>
+        <input class="auth-input" type="email" id="siEmail" placeholder="you@example.com" autocomplete="email">
+        <span class="auth-err" id="siEmailErr"></span>
+      </div>
+      <div class="auth-field">
+        <label>Password</label>
+        <input class="auth-input" type="password" id="siPassword" placeholder="Your password" autocomplete="current-password">
+        <span class="auth-err" id="siPassErr"></span>
+      </div>
+      <div class="auth-form-err" id="siFormErr"></div>
+      <button class="btn-auth" id="siBtn" onclick="handleSignin()">Sign In</button>
+    </div>
+
+    <!-- SIGN UP -->
+    <div id="signupForm" style="display:none">
+      <div class="auth-field">
+        <label>Full Name</label>
+        <input class="auth-input" type="text" id="suName" placeholder="John Smith" autocomplete="name">
+        <span class="auth-err" id="suNameErr"></span>
+      </div>
+      <div class="auth-field">
+        <label>Email</label>
+        <input class="auth-input" type="email" id="suEmail" placeholder="you@example.com" autocomplete="email">
+        <span class="auth-err" id="suEmailErr"></span>
+      </div>
+      <div class="auth-field">
+        <label>Password</label>
+        <input class="auth-input" type="password" id="suPassword" placeholder="Min 8 chars, letter + number" autocomplete="new-password">
+        <span class="auth-err" id="suPassErr"></span>
+      </div>
+      <div class="auth-form-err" id="suFormErr"></div>
+      <button class="btn-auth" id="suBtn" onclick="handleSignup()">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp" style="display:none">
+<div class="container">
+
+  <!-- BANNER -->
+  <div class="site-banner">
+    <div class="banner-grid">
+      <div class="banner-left">
+        <div class="banner-eyebrow">LinkedIn Lead Intelligence</div>
+        <div class="banner-headline">Hey, <span id="bannerUserName"></span> &#128075;</div>
+        <p class="banner-sub">
+          <strong>Find</strong> the right people &nbsp;&middot;&nbsp;
+          <strong>Filter</strong> with precision &nbsp;&middot;&nbsp;
+          <strong>Analyze</strong> what matters
+        </p>
+      </div>
+      <div class="banner-right">
+        <div class="banner-logo">
+          <div class="li-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zm2-3a2 2 0 100-4 2 2 0 000 4z"/></svg>
+          </div>
+          <span class="banner-logo-text">Lead Intel</span>
+        </div>
+        <div class="user-bar-wrap">
+          <div class="user-bar">
+            <button class="btn-history" onclick="openHistory()">History</button>
+            <button class="btn-logout" onclick="logout()">Logout</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- SEARCH FORM -->
   <div class="search-form" id="searchForm">
@@ -354,10 +494,6 @@
       <div class="field">
         <label>Industry</label>
         <div class="ms-wrap" id="msIndustry"></div>
-      </div>
-      <div class="field">
-        <label>Max Profiles</label>
-        <input type="number" id="maxItems" value="50" min="50" max="500">
       </div>
     </div>
 
@@ -472,6 +608,20 @@
       <button class="btn-secondary btn-sm" onclick="exportCSV('analyzed')">Export Full Analysis CSV</button>
     </div>
     <div id="resultsList"></div>
+  </div>
+
+  <!-- HISTORY PANEL -->
+  <div class="history-panel" id="historyPanel">
+    <div class="hp-backdrop" onclick="closeHistory()"></div>
+    <div class="hp-inner">
+      <div class="hp-header">
+        <div class="hp-title">Search History</div>
+        <button class="hp-close" onclick="closeHistory()">&times;</button>
+      </div>
+      <div class="hp-body" id="historyBody">
+        <div class="hp-loading">Loading...</div>
+      </div>
+    </div>
   </div>
 
   <!-- FOOTER -->
@@ -597,8 +747,6 @@
 
     // Live form validation — drives Search button enabled state
     document.getElementById('searchQuery').addEventListener('input', validateForm);
-    document.getElementById('maxItems').addEventListener('input', validateForm);
-    document.getElementById('maxItems').addEventListener('blur', validateForm);
     validateForm(); // set initial state
 
     // Close dropdowns on outside click
@@ -711,7 +859,6 @@
 
     const data = {
       searchQuery: document.getElementById('searchQuery').value.trim(),
-      maxItems: parseInt(document.getElementById('maxItems').value) || 50,
     };
     // Tag fields
     for (const [key, vals] of Object.entries(tagData)) {
@@ -794,27 +941,14 @@
 
   // ─── FORM VALIDATION ─────────────────────────────────────
   function validateForm() {
-    const maxInput = document.getElementById('maxItems');
-    const maxVal = parseInt(maxInput.value, 10);
-    const maxOk = !isNaN(maxVal) && maxVal >= 50;
     const queryOk = document.getElementById('searchQuery').value.trim().length > 0;
-
-    // maxItems visual feedback
-    if (!maxOk) {
-      maxInput.style.borderColor = '#e17055';
-      maxInput.style.boxShadow = '0 0 0 3px rgba(225,112,85,0.15)';
-    } else {
-      maxInput.style.borderColor = '';
-      maxInput.style.boxShadow = '';
-    }
-
-    document.getElementById('searchBtn').disabled = !(queryOk && maxOk);
+    document.getElementById('searchBtn').disabled = !queryOk;
   }
 
   // ─── MAIN SEARCH FLOW ────────────────────────────────────
   async function startSearch() {
     const data = gatherFormData();
-    if (!data.searchQuery || data.maxItems < 50) return; // guard (button should already be disabled)
+    if (!data.searchQuery) return;
 
     const btn = document.getElementById('searchBtn');
     btn.disabled = true; btn.textContent = 'Searching...';
@@ -831,11 +965,12 @@
     startMessages(SCRAPING_MESSAGES);
 
     try {
-      const res = await fetch('/api/search/start', {
+      const res = await authFetch('/api/search/start', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data),
       });
+      if (handleAuthError(res)) { btn.disabled = false; btn.textContent = 'Search'; return; }
       const result = await res.json();
       jobId = result.job_id;
       // Persist immediately so a browser refresh can reconnect to this job
@@ -855,7 +990,7 @@
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = setInterval(async () => {
       try {
-        const res = await fetch(`/api/search/progress/${jobId}`);
+        const res = await authFetch(`/api/search/progress/${jobId}`);
         const job = await res.json();
         handleJobUpdate(job);
       } catch (e) { console.warn('Poll error:', e); }
@@ -1025,6 +1160,7 @@
             searchQuery: document.getElementById('searchQuery').value.trim(),
             timestamp: Date.now(),
             jobId: jobId,
+            userEmail: currentUser?.email,
           }));
         } catch (e) {
           // QuotaExceededError — try without posts as a last resort
@@ -1035,6 +1171,7 @@
               searchQuery: document.getElementById('searchQuery').value.trim(),
               timestamp: Date.now(),
               jobId: jobId,
+              userEmail: currentUser?.email,
             }));
           } catch (_) { /* storage unavailable — results won't persist across refresh */ }
         }
@@ -1124,11 +1261,12 @@
     setPipeline(4);
 
     try {
-      const res = await fetch(`/api/search/${jobId}/select`, {
+      const res = await authFetch(`/api/search/${jobId}/select`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({linkedin_urls: urls}),
       });
+      if (handleAuthError(res)) return;
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.detail || 'Failed to start post scraping');
@@ -1143,8 +1281,44 @@
   }
 
   function exportCSV(type) {
-    if (!jobId) return;
-    window.location.href = `/api/export/${type}/${jobId}`;
+    let rows, filename, headers;
+
+    if (type === 'analyzed') {
+      if (!analyzedProfiles.length) return alert('No analyzed profiles to export.');
+      headers = ["Name","Headline","Company","Country","City","Email","LinkedIn URL",
+                 "Connections","Followers","Hiring","Relevance Score","Activity Level",
+                 "Key Topics","Areas of Interest","Recent Activity Summary",
+                 "Engagement Metrics","Recommendation","Reasoning"];
+      rows = analyzedProfiles.map(p => {
+        const a = p.analysis || {};
+        return [p.name, p.headline, p.company, p.country, p.city, p.email, p.linkedin_url,
+                p.connections, p.followers, p.is_hiring ? 'Yes' : 'No',
+                a.relevance_score, a.activity_level,
+                (a.key_topics||[]).join('; '),
+                (a.areas_of_interest||[]).join('; '),
+                a.recent_activity_summary, a.engagement_metrics,
+                a.recommendation, a.reasoning];
+      });
+      filename = 'analyzed_profiles.csv';
+
+    } else {
+      const data = type === 'with-email' ? selectionData.with_email : selectionData.without_email;
+      if (!data || !data.length) return alert('No profiles to export.');
+      headers = ["Name","Headline","Company","Country","City","Email","LinkedIn URL","Connections","Followers","Hiring"];
+      rows = data.map(p => [p.name, p.headline, p.company, p.country, p.city, p.email,
+                             p.linkedin_url, p.connections, p.followers, p.is_hiring ? 'Yes' : 'No']);
+      filename = type === 'with-email' ? 'profiles_with_email.csv' : 'profiles_without_email.csv';
+    }
+
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], {type: 'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
   }
 
   // ─── FINAL RESULTS ────────────────────────────────────────
@@ -1225,14 +1399,14 @@
   // ─── OUTREACH EMAIL ───────────────────────────────────────
   async function draftOutreachEmail(index, btn) {
     const p = analyzedProfiles[index];
-    if (!p || !p.email || !jobId) return;
+    if (!p || !p.email) return;
 
     const origHtml = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = `<svg class="spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 019 9"/></svg> Drafting...`;
 
     try {
-      const res = await fetch(`/api/draft-email/${jobId || 'local'}`, {
+      const res = await authFetch(`/api/draft-email/${jobId || 'local'}`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         // Send the full profile so the backend can work even after a Lambda cold start
@@ -1371,7 +1545,7 @@
   async function sendChatMessage() {
     const input = document.getElementById('chatInput');
     const message = input.value.trim();
-    if (!message || !chatCurrentProfile || !jobId) return;
+    if (!message || !chatCurrentProfile) return;
 
     const btn = document.getElementById('chatSendBtn');
     input.value = '';
@@ -1382,7 +1556,7 @@
     showTyping();
 
     try {
-      const res = await fetch(`/api/chat/${jobId || 'local'}`, {
+      const res = await authFetch(`/api/chat/${jobId || 'local'}`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         // Send the full profile so the backend can work even after a Lambda cold start
@@ -1575,8 +1749,8 @@
     });
   });
 
-  // On page load: reconnect to an in-progress job OR restore completed results
-  (async function onPageLoad() {
+  // Called after login to reconnect to any in-progress job or restore results
+  async function onPageLoad() {
     const savedJobId    = localStorage.getItem('leadIntelJobId');
     const savedQuery    = localStorage.getItem('leadIntelSearchQuery');
     const btn           = document.getElementById('searchBtn');
@@ -1589,7 +1763,7 @@
 
     if (savedJobId) {
       try {
-        const res = await fetch(`/api/search/progress/${savedJobId}`);
+        const res = await authFetch(`/api/search/progress/${savedJobId}`);
         if (!res.ok) throw new Error('not found');
         const job = await res.json();
         jobId = savedJobId;
@@ -1673,7 +1847,284 @@
       setPipeline(6, true);
       renderResults(cache.analyzed);
     } catch (e) {}
+  }
+
+  // ─── HISTORY PANEL ────────────────────────────────────────
+  async function openHistory() {
+    document.getElementById('historyPanel').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    const body = document.getElementById('historyBody');
+    body.innerHTML = '<div class="hp-loading">Loading history...</div>';
+
+    try {
+      const res = await authFetch('/api/history');
+      const cycles = await res.json();
+
+      if (!cycles.length) {
+        body.innerHTML = '<div class="hp-empty">No past runs yet.<br>Run a search to see your history here.</div>';
+        return;
+      }
+
+      body.innerHTML = cycles.map(c => {
+        const date = new Date(c.completed_at).toLocaleString();
+        return `
+          <div class="hp-item" onclick="loadHistoryItem('${c._id}')">
+            <div class="hp-query">${esc(c.search_query)}</div>
+            <div class="hp-meta">${date}</div>
+            <div class="hp-badges">
+              <span class="hp-badge">${c.analyzed_count} analyzed</span>
+              <span class="hp-badge green">${c.profiles_with_email_count} with email</span>
+            </div>
+          </div>`;
+      }).join('');
+    } catch (e) {
+      body.innerHTML = '<div class="hp-empty">Failed to load history.</div>';
+    }
+  }
+
+  function closeHistory() {
+    document.getElementById('historyPanel').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  async function loadHistoryItem(cycleId) {
+    const body = document.getElementById('historyBody');
+    body.innerHTML = '<div class="hp-loading">Loading results...</div>';
+
+    try {
+      const res = await authFetch(`/api/history/${cycleId}`);
+      if (!res.ok) throw new Error('Failed');
+      const cycle = await res.json();
+
+      closeHistory();
+
+      // Restore UI with historical results
+      jobId = null;
+      document.getElementById('pipeline').classList.add('visible');
+      setPipeline(6, true);
+      document.getElementById('selectionSection').classList.remove('visible');
+      document.getElementById('scoringStage').classList.remove('visible');
+      document.getElementById('floatingDeepSearch').classList.remove('visible');
+      document.getElementById('searchQuery').value = cycle.search_query || '';
+      renderResults(cycle.analyzed_profiles || []);
+
+      // Scroll to results
+      document.getElementById('resultsSection').scrollIntoView({behavior: 'smooth', block: 'start'});
+    } catch (e) {
+      body.innerHTML = '<div class="hp-empty">Failed to load this run.</div>';
+    }
+  }
+
+  // ─── AUTH ─────────────────────────────────────────────────
+  let authToken = localStorage.getItem('leadIntelToken');
+  let currentUser = null;
+
+  function authFetch(url, options = {}) {
+    const headers = Object.assign({}, options.headers || {});
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    return fetch(url, Object.assign({}, options, { headers }));
+  }
+
+  function handleAuthError(res) {
+    // Call this after authFetch in auth-required actions
+    if (res && res.status === 401) { logout(); return true; }
+    return false;
+  }
+
+  function validateEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+  function validatePassword(password) {
+    return password.length >= 8 && /[a-zA-Z]/.test(password) && /[0-9]/.test(password);
+  }
+
+  function clearAuthErrors() {
+    ['siEmailErr','siPassErr','suNameErr','suEmailErr','suPassErr'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '';
+    });
+    ['siFormErr','suFormErr'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = ''; el.classList.remove('visible'); }
+    });
+    document.querySelectorAll('.auth-input').forEach(i => i.classList.remove('error'));
+  }
+
+  function showAuthError(formErrId, msg) {
+    const el = document.getElementById(formErrId);
+    el.textContent = msg;
+    el.classList.add('visible');
+  }
+
+  async function handleSignin() {
+    clearAuthErrors();
+    const email = document.getElementById('siEmail').value.trim();
+    const password = document.getElementById('siPassword').value;
+    let valid = true;
+
+    if (!validateEmail(email)) {
+      document.getElementById('siEmailErr').textContent = 'Enter a valid email address';
+      document.getElementById('siEmail').classList.add('error');
+      valid = false;
+    }
+    if (!password) {
+      document.getElementById('siPassErr').textContent = 'Password is required';
+      document.getElementById('siPassword').classList.add('error');
+      valid = false;
+    }
+    if (!valid) return;
+
+    const btn = document.getElementById('siBtn');
+    btn.disabled = true; btn.textContent = 'Signing in...';
+
+    try {
+      const res = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email, password}),
+      });
+      const data = await res.json();
+      if (!res.ok) { showAuthError('siFormErr', data.detail || 'Sign in failed'); btn.disabled = false; btn.textContent = 'Sign In'; return; }
+      authToken = data.token;
+      currentUser = {name: data.name, email: data.email};
+      localStorage.setItem('leadIntelToken', authToken);
+      localStorage.setItem('leadIntelUser', JSON.stringify(currentUser));
+      showApp();
+    } catch (e) {
+      showAuthError('siFormErr', 'Network error. Please try again.');
+      btn.disabled = false; btn.textContent = 'Sign In';
+    }
+  }
+
+  async function handleSignup() {
+    clearAuthErrors();
+    const name = document.getElementById('suName').value.trim();
+    const email = document.getElementById('suEmail').value.trim();
+    const password = document.getElementById('suPassword').value;
+    let valid = true;
+
+    if (!name) {
+      document.getElementById('suNameErr').textContent = 'Name is required';
+      document.getElementById('suName').classList.add('error');
+      valid = false;
+    }
+    if (!validateEmail(email)) {
+      document.getElementById('suEmailErr').textContent = 'Enter a valid email address';
+      document.getElementById('suEmail').classList.add('error');
+      valid = false;
+    }
+    if (!validatePassword(password)) {
+      document.getElementById('suPassErr').textContent = 'Min 8 characters with at least one letter and one number';
+      document.getElementById('suPassword').classList.add('error');
+      valid = false;
+    }
+    if (!valid) return;
+
+    const btn = document.getElementById('suBtn');
+    btn.disabled = true; btn.textContent = 'Creating account...';
+
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, email, password}),
+      });
+      const data = await res.json();
+      if (!res.ok) { showAuthError('suFormErr', data.detail || 'Sign up failed'); btn.disabled = false; btn.textContent = 'Create Account'; return; }
+      authToken = data.token;
+      currentUser = {name: data.name, email: data.email};
+      localStorage.setItem('leadIntelToken', authToken);
+      localStorage.setItem('leadIntelUser', JSON.stringify(currentUser));
+      showApp();
+    } catch (e) {
+      showAuthError('suFormErr', 'Network error. Please try again.');
+      btn.disabled = false; btn.textContent = 'Create Account';
+    }
+  }
+
+  function switchAuthTab(tab) {
+    document.getElementById('signinForm').style.display = tab === 'signin' ? '' : 'none';
+    document.getElementById('signupForm').style.display = tab === 'signup' ? '' : 'none';
+    document.getElementById('signinTab').classList.toggle('active', tab === 'signin');
+    document.getElementById('signupTab').classList.toggle('active', tab === 'signup');
+    clearAuthErrors();
+  }
+
+  function showApp() {
+    document.getElementById('authOverlay').style.display = 'none';
+    document.getElementById('mainApp').style.display = '';
+    if (currentUser) {
+      const firstName = currentUser.name.split(' ')[0];
+      document.getElementById('bannerUserName').textContent = firstName;
+    }
+
+    // Clear stale cache if it belongs to a different user
+    try {
+      const raw = localStorage.getItem('leadIntelCache');
+      if (raw) {
+        const cache = JSON.parse(raw);
+        if (cache.userEmail && cache.userEmail !== currentUser.email) {
+          ['leadIntelCache','leadIntelJobId','leadIntelSelectionData','leadIntelSearchQuery'].forEach(k => localStorage.removeItem(k));
+        }
+      }
+    } catch(e) {}
+
+    onPageLoad();
+  }
+
+  function logout() {
+    authToken = null; currentUser = null;
+    ['leadIntelToken','leadIntelUser','leadIntelJobId','leadIntelCache','leadIntelSelectionData','leadIntelSearchQuery']
+      .forEach(k => localStorage.removeItem(k));
+
+    // Reset all in-memory state
+    analyzedProfiles = [];
+    jobId = null;
+
+    // Reset UI sections
+    document.getElementById('pipeline').classList.remove('visible');
+    document.getElementById('resultsSection').classList.remove('visible');
+    const selSec = document.getElementById('selectionSection');
+    if (selSec) selSec.classList.remove('visible');
+    const scoringStage = document.getElementById('scoringStage');
+    if (scoringStage) scoringStage.classList.remove('visible');
+    const floatingBtn = document.getElementById('floatingDeepSearch');
+    if (floatingBtn) floatingBtn.classList.remove('visible');
+
+    // Reset search form
+    document.getElementById('searchQuery').value = '';
+    const searchBtn = document.getElementById('searchBtn');
+    if (searchBtn) { searchBtn.style.display = ''; searchBtn.disabled = false; searchBtn.textContent = 'Search'; }
+
+    // Reset auth buttons to their default labels
+    const siBtn = document.getElementById('siBtn');
+    const suBtn = document.getElementById('suBtn');
+    if (siBtn) { siBtn.disabled = false; siBtn.textContent = 'Sign In'; }
+    if (suBtn) { suBtn.disabled = false; suBtn.textContent = 'Create Account'; }
+    clearAuthErrors();
+    switchAuthTab('signin');
+
+    document.getElementById('authOverlay').style.display = 'flex';
+    document.getElementById('mainApp').style.display = 'none';
+  }
+
+  // Check saved session on page open
+  (function checkAuth() {
+    const stored = localStorage.getItem('leadIntelUser');
+    if (authToken && stored) {
+      try {
+        currentUser = JSON.parse(stored);
+        showApp();
+        return;
+      } catch(e) {}
+    }
+    // No valid session — show auth
+    document.getElementById('authOverlay').style.display = 'flex';
+    document.getElementById('mainApp').style.display = 'none';
   })();
+
 </script>
+</div><!-- /.container -->
+</div><!-- /#mainApp -->
 </body>
 </html>

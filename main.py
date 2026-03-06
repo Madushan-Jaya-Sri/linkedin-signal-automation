@@ -50,6 +50,7 @@ if _mongo_uri:
 
 # ─── Auth Setup ────────────────────────────────────────────────
 SECRET_KEY = os.getenv("JWT_SECRET", "linkedin-intel-dev-secret-change-in-prod")
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_DAYS = 7
 
@@ -80,10 +81,27 @@ def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security_sche
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
-# ─── Auth Endpoints ────────────────────────────────────────────
+# ─── Admin Auth Helper ─────────────────────────────────────────
 
-@app.post("/api/auth/signup")
-async def signup(request: Request):
+def require_admin(request: Request):
+    secret = request.headers.get("X-Admin-Secret", "")
+    if not ADMIN_SECRET or secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+
+
+# ─── Admin Endpoints ───────────────────────────────────────────
+
+@app.post("/api/admin/verify")
+async def admin_verify(request: Request):
+    """Verify admin secret — used by admin UI login."""
+    require_admin(request)
+    return {"ok": True}
+
+
+@app.post("/api/admin/users")
+async def admin_create_user(request: Request):
+    """Admin creates a user account."""
+    require_admin(request)
     if db is None:
         raise HTTPException(status_code=503, detail="Database not configured")
     body = await request.json()
@@ -101,9 +119,35 @@ async def signup(request: Request):
         })
     except DuplicateKeyError:
         raise HTTPException(status_code=409, detail="Email already registered")
-    token = create_token(email)
-    return {"token": token, "name": name, "email": email}
+    return {"ok": True, "name": name, "email": email}
 
+
+@app.get("/api/admin/users")
+async def admin_list_users(request: Request):
+    """Admin lists all users."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    users = list(db.users.find({}, {"_id": 0, "name": 1, "email": 1, "created_at": 1}))
+    for u in users:
+        if isinstance(u.get("created_at"), datetime):
+            u["created_at"] = u["created_at"].isoformat()
+    return users
+
+
+@app.delete("/api/admin/users/{email}")
+async def admin_delete_user(email: str, request: Request):
+    """Admin deletes a user account."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    result = db.users.delete_one({"email": email.lower()})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"ok": True}
+
+
+# ─── Auth Endpoints ────────────────────────────────────────────
 
 @app.post("/api/auth/signin")
 async def signin(request: Request):
@@ -276,6 +320,11 @@ def _run_phase2(job_id: str, selected_urls: list[str]):
 @app.get("/")
 async def serve_index():
     return FileResponse("static/index.html")
+
+
+@app.get("/admin")
+async def serve_admin():
+    return FileResponse("static/admin.html")
 
 
 @app.post("/api/search/start")

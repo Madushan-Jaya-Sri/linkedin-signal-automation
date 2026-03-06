@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — LinkedIn Lead Intelligence</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4ff; color: #2d3436; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 40px 16px; }
+
+  /* LOGIN */
+  .login-card { background: #fff; border-radius: 18px; padding: 40px 36px; width: 100%; max-width: 380px; box-shadow: 0 8px 32px rgba(79,106,246,0.13); border: 1px solid #e0e3ea; }
+  .login-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+  .login-icon { width: 40px; height: 40px; border-radius: 10px; background: #0077b5; display: flex; align-items: center; justify-content: center; }
+  .login-icon svg { display: block; }
+  .login-title { font-size: 1.1rem; font-weight: 800; color: #1a1a2e; }
+  .login-sub { font-size: 0.72rem; color: #b2bec3; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
+  .login-label { font-size: 0.7rem; color: #636e72; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; margin-bottom: 6px; display: block; }
+  .login-input { width: 100%; background: #f8f9fc; border: 1px solid #e0e3ea; border-radius: 8px; padding: 11px 14px; font-size: 0.9rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; margin-bottom: 20px; }
+  .login-input:focus { border-color: #4f6af6; box-shadow: 0 0 0 3px rgba(79,106,246,0.1); }
+  .btn-login { width: 100%; background: #4f6af6; color: #fff; border: none; border-radius: 8px; padding: 12px; font-size: 0.9rem; font-weight: 700; cursor: pointer; transition: background 0.2s; }
+  .btn-login:hover { background: #3d56d4; }
+  .btn-login:disabled { background: #b2bec3; cursor: not-allowed; }
+  .login-err { color: #e17055; font-size: 0.8rem; margin-top: -12px; margin-bottom: 14px; display: none; }
+
+  /* DASHBOARD */
+  .dashboard { width: 100%; max-width: 780px; display: none; }
+  .dash-header { background: linear-gradient(120deg, #0a1628, #0d2244, #0a3d7a, #0077b5); background-size: 300% 300%; animation: bannerShift 12s ease infinite; border-radius: 18px; padding: 26px 32px; margin-bottom: 28px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 6px 24px rgba(0,55,120,0.22); }
+  @keyframes bannerShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+  .dash-brand { display: flex; align-items: center; gap: 10px; }
+  .dash-icon { width: 38px; height: 38px; border-radius: 9px; background: rgba(0,119,181,0.85); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(0,119,181,0.5); }
+  .dash-title { font-size: 1rem; font-weight: 800; color: #fff; }
+  .dash-eyebrow { font-size: 0.65rem; color: rgba(255,255,255,0.45); font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; }
+  .btn-logout-admin { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 6px 14px; font-size: 0.75rem; color: rgba(255,255,255,0.7); cursor: pointer; transition: all 0.15s; font-weight: 500; }
+  .btn-logout-admin:hover { background: rgba(231,76,60,0.25); color: #ff7675; border-color: rgba(231,76,60,0.4); }
+
+  /* CREATE USER CARD */
+  .card { background: #fff; border-radius: 14px; padding: 28px 28px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #e0e3ea; }
+  .card-title { font-size: 0.95rem; font-weight: 700; color: #1a1a2e; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+  .card-title svg { color: #4f6af6; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 0.68rem; color: #636e72; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+  .field input { background: #f8f9fc; border: 1px solid #e0e3ea; border-radius: 8px; padding: 10px 13px; font-size: 0.88rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+  .field input:focus { border-color: #4f6af6; box-shadow: 0 0 0 3px rgba(79,106,246,0.1); }
+  .form-actions { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+  .btn-create { background: #4f6af6; color: #fff; border: none; border-radius: 8px; padding: 10px 24px; font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: background 0.2s; }
+  .btn-create:hover { background: #3d56d4; }
+  .btn-create:disabled { background: #b2bec3; cursor: not-allowed; }
+  .form-msg { font-size: 0.8rem; font-weight: 500; }
+  .form-msg.ok { color: #00b894; }
+  .form-msg.err { color: #e17055; }
+
+  /* USERS TABLE */
+  .users-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .btn-refresh { background: none; border: 1px solid #e0e3ea; border-radius: 8px; padding: 6px 14px; font-size: 0.78rem; color: #4f6af6; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .btn-refresh:hover { background: #f0f4ff; }
+  .users-table { width: 100%; border-collapse: collapse; }
+  .users-table th { text-align: left; font-size: 0.67rem; color: #b2bec3; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; padding: 0 12px 10px; border-bottom: 1px solid #f0f2f5; }
+  .users-table td { padding: 12px; font-size: 0.85rem; border-bottom: 1px solid #f8f9fc; vertical-align: middle; }
+  .users-table tr:last-child td { border-bottom: none; }
+  .users-table tr:hover td { background: #fafbff; }
+  .user-name { font-weight: 600; color: #1a1a2e; }
+  .user-email { color: #636e72; font-size: 0.8rem; }
+  .user-date { color: #b2bec3; font-size: 0.78rem; }
+  .btn-delete { background: none; border: 1px solid #fab1a0; color: #e17055; border-radius: 6px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; transition: all 0.15s; font-weight: 600; }
+  .btn-delete:hover { background: #fde8e8; border-color: #e17055; }
+  .empty-state { text-align: center; padding: 32px; color: #b2bec3; font-size: 0.85rem; }
+  .badge-count { background: #e8ecff; color: #4f6af6; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 6px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-card" id="loginCard">
+  <div class="login-logo">
+    <div class="login-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zm2-3a2 2 0 100-4 2 2 0 000 4z"/></svg>
+    </div>
+    <div>
+      <div class="login-title">Lead Intel Admin</div>
+      <div class="login-sub">Restricted Access</div>
+    </div>
+  </div>
+  <label class="login-label">Admin Password</label>
+  <input class="login-input" type="password" id="adminSecret" placeholder="Enter admin password" onkeydown="if(event.key==='Enter') login()">
+  <div class="login-err" id="loginErr">Incorrect password. Try again.</div>
+  <button class="btn-login" id="loginBtn" onclick="login()">Access Dashboard</button>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard" id="dashboard">
+  <div class="dash-header">
+    <div class="dash-brand">
+      <div class="dash-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zm2-3a2 2 0 100-4 2 2 0 000 4z"/></svg>
+      </div>
+      <div>
+        <div class="dash-eyebrow">Admin Panel</div>
+        <div class="dash-title">LinkedIn Lead Intelligence</div>
+      </div>
+    </div>
+    <button class="btn-logout-admin" onclick="logout()">Logout</button>
+  </div>
+
+  <!-- Create User -->
+  <div class="card">
+    <div class="card-title">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+      Grant Access to New User
+    </div>
+    <div class="form-row three">
+      <div class="field">
+        <label>Full Name</label>
+        <input type="text" id="newName" placeholder="Jane Smith">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="newEmail" placeholder="jane@company.com">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="newPassword" placeholder="Set a password" onkeydown="if(event.key==='Enter') createUser()">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-create" id="createBtn" onclick="createUser()">Create Account</button>
+      <span class="form-msg" id="createMsg"></span>
+    </div>
+  </div>
+
+  <!-- Users List -->
+  <div class="card">
+    <div class="users-header">
+      <div class="card-title" style="margin:0">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Active Users <span class="badge-count" id="userCount">0</span>
+      </div>
+      <button class="btn-refresh" onclick="loadUsers()">Refresh</button>
+    </div>
+    <table class="users-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="usersBody">
+        <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  let adminSecret = '';
+
+  async function login() {
+    const btn = document.getElementById('loginBtn');
+    const err = document.getElementById('loginErr');
+    const secret = document.getElementById('adminSecret').value.trim();
+    if (!secret) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Verifying...';
+    err.style.display = 'none';
+
+    const res = await fetch('/api/admin/verify', {
+      method: 'POST',
+      headers: { 'X-Admin-Secret': secret }
+    });
+
+    if (res.ok) {
+      adminSecret = secret;
+      sessionStorage.setItem('adminSecret', secret);
+      showDashboard();
+    } else {
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Access Dashboard';
+    }
+  }
+
+  function showDashboard() {
+    document.getElementById('loginCard').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    loadUsers();
+  }
+
+  function logout() {
+    adminSecret = '';
+    sessionStorage.removeItem('adminSecret');
+    document.getElementById('loginCard').style.display = 'flex';
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('adminSecret').value = '';
+  }
+
+  async function createUser() {
+    const name = document.getElementById('newName').value.trim();
+    const email = document.getElementById('newEmail').value.trim();
+    const password = document.getElementById('newPassword').value;
+    const msg = document.getElementById('createMsg');
+    const btn = document.getElementById('createBtn');
+
+    if (!name || !email || !password) {
+      msg.className = 'form-msg err';
+      msg.textContent = 'All fields are required.';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+    msg.textContent = '';
+
+    const res = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': adminSecret },
+      body: JSON.stringify({ name, email, password })
+    });
+    const data = await res.json();
+
+    btn.disabled = false;
+    btn.textContent = 'Create Account';
+
+    if (res.ok) {
+      msg.className = 'form-msg ok';
+      msg.textContent = `Access granted to ${name}.`;
+      document.getElementById('newName').value = '';
+      document.getElementById('newEmail').value = '';
+      document.getElementById('newPassword').value = '';
+      loadUsers();
+    } else {
+      msg.className = 'form-msg err';
+      msg.textContent = data.detail || 'Failed to create user.';
+    }
+  }
+
+  async function loadUsers() {
+    const body = document.getElementById('usersBody');
+    body.innerHTML = '<tr><td colspan="4" class="empty-state">Loading...</td></tr>';
+
+    const res = await fetch('/api/admin/users', {
+      headers: { 'X-Admin-Secret': adminSecret }
+    });
+
+    if (!res.ok) {
+      body.innerHTML = '<tr><td colspan="4" class="empty-state">Failed to load users.</td></tr>';
+      return;
+    }
+
+    const users = await res.json();
+    document.getElementById('userCount').textContent = users.length;
+
+    if (!users.length) {
+      body.innerHTML = '<tr><td colspan="4" class="empty-state">No users yet. Create one above.</td></tr>';
+      return;
+    }
+
+    body.innerHTML = users.map(u => {
+      const date = u.created_at ? new Date(u.created_at).toLocaleDateString() : '—';
+      return `<tr>
+        <td class="user-name">${esc(u.name)}</td>
+        <td class="user-email">${esc(u.email)}</td>
+        <td class="user-date">${date}</td>
+        <td><button class="btn-delete" onclick="deleteUser('${esc(u.email)}', this)">Revoke</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function deleteUser(email, btn) {
+    if (!confirm(`Revoke access for ${email}?`)) return;
+    btn.disabled = true;
+    btn.textContent = '...';
+
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(email)}`, {
+      method: 'DELETE',
+      headers: { 'X-Admin-Secret': adminSecret }
+    });
+
+    if (res.ok) {
+      loadUsers();
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Revoke';
+      alert('Failed to delete user.');
+    }
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Restore session
+  const saved = sessionStorage.getItem('adminSecret');
+  if (saved) { adminSecret = saved; showDashboard(); }
+</script>
+</body>
+</html>

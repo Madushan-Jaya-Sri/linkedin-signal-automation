@@ -403,11 +403,6 @@
       </div>
     </div>
 
-    <div class="auth-tabs">
-      <button class="auth-tab active" id="signinTab" onclick="switchAuthTab('signin')">Sign In</button>
-      <button class="auth-tab" id="signupTab" onclick="switchAuthTab('signup')">Sign Up</button>
-    </div>
-
     <!-- SIGN IN -->
     <div id="signinForm">
       <div class="auth-field">
@@ -417,32 +412,11 @@
       </div>
       <div class="auth-field">
         <label>Password</label>
-        <input class="auth-input" type="password" id="siPassword" placeholder="Your password" autocomplete="current-password">
+        <input class="auth-input" type="password" id="siPassword" placeholder="Your password" autocomplete="current-password" onkeydown="if(event.key==='Enter') handleSignin()">
         <span class="auth-err" id="siPassErr"></span>
       </div>
       <div class="auth-form-err" id="siFormErr"></div>
       <button class="btn-auth" id="siBtn" onclick="handleSignin()">Sign In</button>
-    </div>
-
-    <!-- SIGN UP -->
-    <div id="signupForm" style="display:none">
-      <div class="auth-field">
-        <label>Full Name</label>
-        <input class="auth-input" type="text" id="suName" placeholder="John Smith" autocomplete="name">
-        <span class="auth-err" id="suNameErr"></span>
-      </div>
-      <div class="auth-field">
-        <label>Email</label>
-        <input class="auth-input" type="email" id="suEmail" placeholder="you@example.com" autocomplete="email">
-        <span class="auth-err" id="suEmailErr"></span>
-      </div>
-      <div class="auth-field">
-        <label>Password</label>
-        <input class="auth-input" type="password" id="suPassword" placeholder="Min 8 chars, letter + number" autocomplete="new-password">
-        <span class="auth-err" id="suPassErr"></span>
-      </div>
-      <div class="auth-form-err" id="suFormErr"></div>
-      <button class="btn-auth" id="suBtn" onclick="handleSignup()">Create Account</button>
     </div>
   </div>
 </div>
@@ -1996,57 +1970,7 @@
     }
   }
 
-  async function handleSignup() {
-    clearAuthErrors();
-    const name = document.getElementById('suName').value.trim();
-    const email = document.getElementById('suEmail').value.trim();
-    const password = document.getElementById('suPassword').value;
-    let valid = true;
-
-    if (!name) {
-      document.getElementById('suNameErr').textContent = 'Name is required';
-      document.getElementById('suName').classList.add('error');
-      valid = false;
-    }
-    if (!validateEmail(email)) {
-      document.getElementById('suEmailErr').textContent = 'Enter a valid email address';
-      document.getElementById('suEmail').classList.add('error');
-      valid = false;
-    }
-    if (!validatePassword(password)) {
-      document.getElementById('suPassErr').textContent = 'Min 8 characters with at least one letter and one number';
-      document.getElementById('suPassword').classList.add('error');
-      valid = false;
-    }
-    if (!valid) return;
-
-    const btn = document.getElementById('suBtn');
-    btn.disabled = true; btn.textContent = 'Creating account...';
-
-    try {
-      const res = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name, email, password}),
-      });
-      const data = await res.json();
-      if (!res.ok) { showAuthError('suFormErr', data.detail || 'Sign up failed'); btn.disabled = false; btn.textContent = 'Create Account'; return; }
-      authToken = data.token;
-      currentUser = {name: data.name, email: data.email};
-      localStorage.setItem('leadIntelToken', authToken);
-      localStorage.setItem('leadIntelUser', JSON.stringify(currentUser));
-      showApp();
-    } catch (e) {
-      showAuthError('suFormErr', 'Network error. Please try again.');
-      btn.disabled = false; btn.textContent = 'Create Account';
-    }
-  }
-
-  function switchAuthTab(tab) {
-    document.getElementById('signinForm').style.display = tab === 'signin' ? '' : 'none';
-    document.getElementById('signupForm').style.display = tab === 'signup' ? '' : 'none';
-    document.getElementById('signinTab').classList.toggle('active', tab === 'signin');
-    document.getElementById('signupTab').classList.toggle('active', tab === 'signup');
+  function switchAuthTab() {
     clearAuthErrors();
   }
 
@@ -2096,13 +2020,10 @@
     const searchBtn = document.getElementById('searchBtn');
     if (searchBtn) { searchBtn.style.display = ''; searchBtn.disabled = false; searchBtn.textContent = 'Search'; }
 
-    // Reset auth buttons to their default labels
+    // Reset auth button
     const siBtn = document.getElementById('siBtn');
-    const suBtn = document.getElementById('suBtn');
     if (siBtn) { siBtn.disabled = false; siBtn.textContent = 'Sign In'; }
-    if (suBtn) { suBtn.disabled = false; suBtn.textContent = 'Create Account'; }
     clearAuthErrors();
-    switchAuthTab('signin');
 
     document.getElementById('authOverlay').style.display = 'flex';
     document.getElementById('mainApp').style.display = 'none';

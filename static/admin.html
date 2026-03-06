@@ -193,9 +193,13 @@
   function logout() {
     adminSecret = '';
     sessionStorage.removeItem('adminSecret');
-    document.getElementById('loginCard').style.display = 'flex';
+    document.getElementById('loginCard').style.display = '';
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('adminSecret').value = '';
+    document.getElementById('loginErr').style.display = 'none';
+    const btn = document.getElementById('loginBtn');
+    btn.disabled = false;
+    btn.textContent = 'Access Dashboard';
   }
 
   async function createUser() {

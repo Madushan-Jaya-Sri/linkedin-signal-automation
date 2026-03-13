@@ -240,32 +240,37 @@ def _stem(word: str) -> str:
 
 
 def filter_profiles(profiles: list[dict], search_query: str) -> list[dict]:
-    """Filter profiles by matching all query words against profile text.
+    """Filter profiles by matching query terms against profile text.
 
     Matching rules:
-    - Each word in the query must appear somewhere in the profile text
-      (name, headline, job title, company, about, skills, experience)
-    - Word order is ignored — 'brand manager' and 'manager brand' both match
-    - Singular/plural insensitive — trailing 's' is stripped before matching
-      so 'managers' matches profiles containing 'manager' or 'managers'
-    - Comparison is case-insensitive
+    - Comma-separated terms are treated as OR groups — a profile matches if it
+      satisfies ALL words in at least ONE comma-separated group.
+      e.g. "Employment law, Family law" → matches profiles about employment law
+           OR family law (not both required).
+    - Within each group, all words must appear (AND logic).
+    - Word order is ignored; matching is case-insensitive.
+    - Singular/plural insensitive — trailing 's' stripped before matching.
     """
     query = search_query.strip()
     if not query:
         return profiles
 
-    # Build list of stemmed query words (ignore punctuation, short words)
-    raw_words = re.findall(r"[a-zA-Z']+", query)
-    query_stems = [_stem(w) for w in raw_words if len(w) >= 2]
+    # Split by comma into OR groups, then stem each group's words
+    groups = [g.strip() for g in query.split(',') if g.strip()]
+    stem_groups = []
+    for g in groups:
+        words = re.findall(r"[a-zA-Z']+", g)
+        stems = [_stem(w) for w in words if len(w) >= 2]
+        if stems:
+            stem_groups.append(stems)
 
-    if not query_stems:
+    if not stem_groups:
         return profiles
 
-    print(f"[INFO] Filtering for query stems: {query_stems}")
+    print(f"[INFO] Filtering with OR groups: {stem_groups}")
 
     filtered = []
     for profile in profiles:
-        # Combine all text fields available from the Full scrape mode
         blob = ' '.join(filter(None, [
             profile.get('name', ''),
             profile.get('headline', ''),
@@ -276,11 +281,10 @@ def filter_profiles(profiles: list[dict], search_query: str) -> list[dict]:
             profile.get('experience_summary', ''),
         ])).lower()
 
-        # Stem every word in the blob for comparison
         blob_words = set(_stem(w) for w in re.findall(r"[a-zA-Z']+", blob) if len(w) >= 2)
 
-        # Profile passes if ALL query stems appear in the blob
-        if all(qs in blob_words for qs in query_stems):
+        # Profile passes if ALL stems in ANY group are present
+        if any(all(qs in blob_words for qs in group) for group in stem_groups):
             filtered.append(profile)
 
     print(f"[INFO] Query filter: {len(profiles)} → {len(filtered)} profiles matched '{query}'")

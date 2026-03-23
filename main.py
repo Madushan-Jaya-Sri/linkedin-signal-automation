@@ -164,6 +164,41 @@ async def admin_get_searches(request: Request):
     return cycles
 
 
+@app.get("/api/admin/cycles/{cycle_id}/emails")
+async def admin_get_cycle_emails(cycle_id: str, request: Request):
+    """Admin views all emails found in a specific search cycle."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    from bson import ObjectId
+    try:
+        oid = ObjectId(cycle_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid cycle ID")
+    cycle = db.cycles.find_one(
+        {"_id": oid},
+        {"analyzed_profiles": 1, "search_query": 1, "user_email": 1}
+    )
+    if not cycle:
+        raise HTTPException(status_code=404, detail="Cycle not found")
+    profiles = cycle.get("analyzed_profiles", [])
+    emails = [
+        {
+            "name": p.get("name", ""),
+            "email": p.get("email", ""),
+            "headline": p.get("headline", ""),
+            "company": p.get("company", ""),
+            "linkedin_url": p.get("linkedin_url", ""),
+        }
+        for p in profiles if p.get("email")
+    ]
+    return {
+        "search_query": cycle.get("search_query", ""),
+        "user_email": cycle.get("user_email", ""),
+        "emails": emails
+    }
+
+
 # ─── Auth Endpoints ────────────────────────────────────────────
 
 @app.post("/api/auth/signin")

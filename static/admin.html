@@ -68,6 +68,19 @@
   .btn-delete:hover { background: #fde8e8; border-color: #e17055; }
   .empty-state { text-align: center; padding: 32px; color: #b2bec3; font-size: 0.85rem; }
   .badge-count { background: #e8ecff; color: #4f6af6; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 6px; }
+
+  /* SEARCH ACTIVITY */
+  .search-item { border: 1px solid #f0f2f5; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; transition: background 0.15s; }
+  .search-item:hover { background: #fafbff; }
+  .search-item-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .search-query { font-size: 0.88rem; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
+  .search-meta { font-size: 0.75rem; color: #b2bec3; }
+  .search-user { display: inline-block; background: #e8ecff; color: #4f6af6; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 8px; margin-bottom: 6px; }
+  .search-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+  .search-stat { font-size: 0.72rem; color: #636e72; background: #f8f9fc; border: 1px solid #e0e3ea; border-radius: 6px; padding: 2px 8px; }
+  .search-params { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .param-chip { font-size: 0.68rem; background: #f0f4ff; color: #4f6af6; border: 1px solid #d0d8ff; border-radius: 6px; padding: 2px 8px; }
+  .param-label { font-weight: 700; color: #2d3436; }
 </style>
 </head>
 <body>
@@ -130,6 +143,18 @@
     </div>
   </div>
 
+  <!-- Search Activity -->
+  <div class="card">
+    <div class="users-header">
+      <div class="card-title" style="margin:0">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Search Activity <span class="badge-count" id="searchCount">0</span>
+      </div>
+      <button class="btn-refresh" onclick="loadSearches()">Refresh</button>
+    </div>
+    <div id="searchesBody"><div class="empty-state">Loading...</div></div>
+  </div>
+
   <!-- Users List -->
   <div class="card">
     <div class="users-header">
@@ -187,6 +212,7 @@
   function showDashboard() {
     document.getElementById('loginCard').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
+    loadSearches();
     loadUsers();
   }
 
@@ -240,6 +266,63 @@
       msg.className = 'form-msg err';
       msg.textContent = data.detail || 'Failed to create user.';
     }
+  }
+
+  async function loadSearches() {
+    const body = document.getElementById('searchesBody');
+    body.innerHTML = '<div class="empty-state">Loading...</div>';
+
+    const res = await fetch('/api/admin/searches', {
+      headers: { 'X-Admin-Secret': adminSecret }
+    });
+
+    if (!res.ok) {
+      body.innerHTML = '<div class="empty-state">Failed to load search activity.</div>';
+      return;
+    }
+
+    const cycles = await res.json();
+    document.getElementById('searchCount').textContent = cycles.length;
+
+    if (!cycles.length) {
+      body.innerHTML = '<div class="empty-state">No searches yet.</div>';
+      return;
+    }
+
+    const PARAM_LABELS = {
+      locations: 'Locations', currentJobTitles: 'Job Titles', currentCompanies: 'Companies',
+      pastCompanies: 'Past Companies', schools: 'Schools', industryIds: 'Industries',
+      seniorityLevelIds: 'Seniority', functionIds: 'Functions', companyHeadcount: 'Headcount',
+      yearsOfExperienceIds: 'Experience', profileLanguages: 'Languages',
+      recentlyChangedJobs: 'Recently Changed Jobs', maxItems: 'Max Results'
+    };
+
+    body.innerHTML = cycles.map(c => {
+      const date = new Date(c.completed_at).toLocaleString();
+      const params = c.search_params || {};
+      const paramChips = Object.entries(params)
+        .filter(([k, v]) => k !== 'searchQuery' && v && !(Array.isArray(v) && !v.length))
+        .map(([k, v]) => {
+          const label = PARAM_LABELS[k] || k;
+          const val = Array.isArray(v) ? v.join(', ') : String(v);
+          return `<span class="param-chip"><span class="param-label">${esc(label)}:</span> ${esc(val)}</span>`;
+        }).join('');
+
+      return `<div class="search-item">
+        <div class="search-item-header">
+          <div>
+            <div class="search-user">${esc(c.user_email)}</div>
+            <div class="search-query">${esc(c.search_query || '—')}</div>
+            <div class="search-meta">${date}</div>
+          </div>
+          <div class="search-stats">
+            <span class="search-stat">&#128100; ${c.analyzed_count || 0} analyzed</span>
+            <span class="search-stat">&#9993; ${c.profiles_with_email_count || 0} with email</span>
+          </div>
+        </div>
+        ${paramChips ? `<div class="search-params">${paramChips}</div>` : ''}
+      </div>`;
+    }).join('');
   }
 
   async function loadUsers() {

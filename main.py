@@ -147,6 +147,23 @@ async def admin_delete_user(email: str, request: Request):
     return {"ok": True}
 
 
+@app.get("/api/admin/searches")
+async def admin_get_searches(request: Request):
+    """Admin views all users' search activity."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    cycles = list(db.cycles.find(
+        {},
+        {"analyzed_profiles": 0}
+    ).sort("completed_at", -1).limit(200))
+    for c in cycles:
+        c["_id"] = str(c["_id"])
+        if "completed_at" in c:
+            c["completed_at"] = c["completed_at"].isoformat()
+    return cycles
+
+
 # ─── Auth Endpoints ────────────────────────────────────────────
 
 @app.post("/api/auth/signin")
@@ -177,6 +194,7 @@ def save_cycle_to_db(job: dict):
         db.cycles.insert_one({
             "user_email": user_email,
             "search_query": job.get("search_query", ""),
+            "search_params": job.get("search_params", {}),
             "completed_at": datetime.utcnow(),
             "profiles_with_email_count": len(job.get("profiles_with_email", [])),
             "profiles_without_email_count": len(job.get("profiles_without_email", [])),

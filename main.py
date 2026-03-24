@@ -166,21 +166,20 @@ async def admin_get_searches(request: Request):
 
 @app.get("/api/admin/usage")
 async def admin_get_usage(request: Request):
-    """Admin views deep search usage per user."""
+    """Admin views total analyzed profiles per user vs limit."""
     require_admin(request)
     if db is None:
         raise HTTPException(status_code=503, detail="Database not configured")
-    DEEP_SEARCH_LIMIT = 50
     users = list(db.users.find({}, {"_id": 0, "email": 1, "name": 1}))
     result = []
     for u in users:
-        used = db.cycles.count_documents({"user_email": u["email"]})
+        used = get_total_analyzed(u["email"])
         result.append({
             "email":     u["email"],
             "name":      u.get("name", ""),
             "used":      used,
-            "limit":     DEEP_SEARCH_LIMIT,
-            "remaining": max(0, DEEP_SEARCH_LIMIT - used),
+            "limit":     ANALYZED_PROFILE_LIMIT,
+            "remaining": max(0, ANALYZED_PROFILE_LIMIT - used),
         })
     result.sort(key=lambda x: x["used"], reverse=True)
     return result
@@ -503,15 +502,28 @@ async def get_progress(job_id: str):
     return job
 
 
+ANALYZED_PROFILE_LIMIT = 50
+
+def get_total_analyzed(email: str) -> int:
+    """Sum analyzed_count across all cycles for a user."""
+    if db is None:
+        return 0
+    result = db.cycles.aggregate([
+        {"$match": {"user_email": email}},
+        {"$group": {"_id": None, "total": {"$sum": "$analyzed_count"}}}
+    ])
+    row = next(result, None)
+    return row["total"] if row else 0
+
+
 @app.get("/api/usage")
 async def get_usage(user: dict = Depends(get_current_user)):
-    """Return current user's deep search usage vs limit."""
-    DEEP_SEARCH_LIMIT = 50
-    used = db.cycles.count_documents({"user_email": user["email"]}) if db is not None else 0
+    """Return current user's total analyzed profiles vs limit."""
+    used = get_total_analyzed(user["email"])
     return {
         "used":      used,
-        "limit":     DEEP_SEARCH_LIMIT,
-        "remaining": max(0, DEEP_SEARCH_LIMIT - used),
+        "limit":     ANALYZED_PROFILE_LIMIT,
+        "remaining": max(0, ANALYZED_PROFILE_LIMIT - used),
     }
 
 
@@ -529,21 +541,21 @@ async def select_profiles(job_id: str, request: Request, user: dict = Depends(ge
         raise HTTPException(status_code=400, detail=f"Cannot start Phase 2 — job is in '{job['phase']}' phase")
 
     # ── Usage limit check ──────────────────────────────────────
-    DEEP_SEARCH_LIMIT = 50
-    if db is not None:
-        used = db.cycles.count_documents({"user_email": user["email"]})
-        if used >= DEEP_SEARCH_LIMIT:
-            raise HTTPException(
-                status_code=429,
-                detail=f"Deep search limit reached ({DEEP_SEARCH_LIMIT}/{DEEP_SEARCH_LIMIT}). Please contact support to upgrade your plan."
-            )
+    used = get_total_analyzed(user["email"])
+    remaining = max(0, ANALYZED_PROFILE_LIMIT - used)
+    if remaining == 0:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Analyzed profile limit reached ({ANALYZED_PROFILE_LIMIT}/{ANALYZED_PROFILE_LIMIT}). Please contact support to upgrade your plan."
+        )
 
     body = await request.json()
     selected_urls = body.get("linkedin_urls", [])
     if not selected_urls:
         raise HTTPException(status_code=400, detail="No profiles selected")
 
-    selected_urls = selected_urls[:25]
+    # Cap selection to remaining quota
+    selected_urls = selected_urls[:min(25, remaining)]
 
     if job["phase"] == "complete":
         job["analyzed_profiles"] = []

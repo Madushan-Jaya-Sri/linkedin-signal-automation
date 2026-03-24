@@ -128,7 +128,7 @@ async def admin_list_users(request: Request):
     require_admin(request)
     if db is None:
         raise HTTPException(status_code=503, detail="Database not configured")
-    users = list(db.users.find({}, {"_id": 0, "name": 1, "email": 1, "created_at": 1}))
+    users = list(db.users.find({"status": {"$ne": "pending"}}, {"_id": 0, "name": 1, "email": 1, "created_at": 1, "status": 1}))
     for u in users:
         if isinstance(u.get("created_at"), datetime):
             u["created_at"] = u["created_at"].isoformat()
@@ -143,6 +143,43 @@ async def admin_delete_user(email: str, request: Request):
         raise HTTPException(status_code=503, detail="Database not configured")
     result = db.users.delete_one({"email": email.lower()})
     if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"ok": True}
+
+
+@app.get("/api/admin/pending")
+async def admin_pending_users(request: Request):
+    """List users with pending status."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    users = list(db.users.find({"status": "pending"}, {"_id": 0, "name": 1, "email": 1, "created_at": 1}))
+    for u in users:
+        if isinstance(u.get("created_at"), datetime):
+            u["created_at"] = u["created_at"].isoformat()
+    return users
+
+
+@app.post("/api/admin/users/{email}/approve")
+async def admin_approve_user(email: str, request: Request):
+    """Approve a pending user."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    result = db.users.update_one({"email": email.lower()}, {"$set": {"status": "approved"}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"ok": True}
+
+
+@app.post("/api/admin/users/{email}/reject")
+async def admin_reject_user(email: str, request: Request):
+    """Reject a pending user."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    result = db.users.update_one({"email": email.lower()}, {"$set": {"status": "rejected"}})
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
     return {"ok": True}
 
@@ -162,6 +199,68 @@ async def admin_get_searches(request: Request):
         if "completed_at" in c:
             c["completed_at"] = c["completed_at"].isoformat()
     return cycles
+
+
+@app.get("/api/admin/usage")
+async def admin_get_usage(request: Request):
+    """Admin views monthly analyzed profiles per user vs plan limit."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    users = list(db.users.find({}, {"_id": 0, "email": 1, "name": 1, "plan": 1}))
+    result = []
+    for u in users:
+        plan  = u.get("plan", DEFAULT_PLAN)
+        limit = get_plan_limit(plan)
+        used  = get_monthly_analyzed(u["email"])
+        result.append({
+            "email":     u["email"],
+            "name":      u.get("name", ""),
+            "plan":      plan,
+            "used":      used,
+            "limit":     limit,
+            "remaining": max(0, limit - used),
+        })
+    result.sort(key=lambda x: x["used"], reverse=True)
+    return result
+
+
+@app.get("/api/admin/settings")
+async def admin_get_settings(request: Request):
+    """Get system settings."""
+    require_admin(request)
+    return {
+        "max_items": get_setting("max_items", 50),
+        "max_posts":  get_setting("max_posts",  10),
+    }
+
+
+@app.put("/api/admin/settings")
+async def admin_update_settings(request: Request):
+    """Update system settings."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    body = await request.json()
+    for key in ["max_items", "max_posts"]:
+        if key in body:
+            val = int(body[key])
+            db.settings.update_one({"key": key}, {"$set": {"key": key, "value": val}}, upsert=True)
+    return {"ok": True}
+
+
+@app.put("/api/admin/users/{email}/plan")
+async def admin_set_user_plan(email: str, request: Request):
+    """Set a user's subscription plan."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    body = await request.json()
+    plan = body.get("plan", DEFAULT_PLAN)
+    if plan not in PLAN_LIMITS:
+        raise HTTPException(status_code=400, detail=f"Invalid plan. Choose: {list(PLAN_LIMITS.keys())}")
+    db.users.update_one({"email": email.lower()}, {"$set": {"plan": plan}})
+    return {"ok": True}
 
 
 @app.get("/api/admin/costs")
@@ -234,6 +333,32 @@ async def admin_get_cycle_emails(cycle_id: str, request: Request):
 
 # ─── Auth Endpoints ────────────────────────────────────────────
 
+@app.post("/api/auth/signup")
+async def signup(request: Request):
+    """Public signup — creates account with pending status for admin approval."""
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    body = await request.json()
+    name     = body.get("name", "").strip()
+    email    = body.get("email", "").strip().lower()
+    password = body.get("password", "")
+    if not name or not email or not password:
+        raise HTTPException(status_code=400, detail="Name, email and password are required")
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    try:
+        db.users.insert_one({
+            "name":       name,
+            "email":      email,
+            "password":   hash_password(password),
+            "status":     "pending",
+            "created_at": datetime.utcnow(),
+        })
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="Email already registered")
+    return {"ok": True, "message": "Request submitted. You'll be notified when your account is approved."}
+
+
 @app.post("/api/auth/signin")
 async def signin(request: Request):
     if db is None:
@@ -244,6 +369,11 @@ async def signin(request: Request):
     user = db.users.find_one({"email": email})
     if not user or not verify_password(password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    status = user.get("status", "approved")
+    if status == "pending":
+        raise HTTPException(status_code=403, detail="Your account is pending approval. Please wait for admin to approve.")
+    if status == "rejected":
+        raise HTTPException(status_code=403, detail="Your account request was rejected. Please contact support.")
     token = create_token(email)
     return {"token": token, "name": user["name"], "email": email}
 
@@ -373,7 +503,7 @@ def _run_phase2(job_id: str, selected_urls: list[str]):
     for i, profile in enumerate(selected):
         job["current_profile_name"] = profile.get("name", "Unknown")
         try:
-            posts = scrape_posts(profile["linkedin_url"], max_posts=20)
+            posts = scrape_posts(profile["linkedin_url"], max_posts=get_setting("max_posts", 10))
             profile["posts"] = posts
         except Exception as e:
             print(f"[WARN] Failed to scrape posts for {profile.get('name')}: {e}")
@@ -424,7 +554,12 @@ def _run_phase2(job_id: str, selected_urls: list[str]):
 # ─── Endpoints ────────────────────────────────────────────────
 
 @app.get("/")
-async def serve_index():
+async def serve_landing():
+    return FileResponse("static/landing.html")
+
+
+@app.get("/app")
+async def serve_app():
     return FileResponse("static/index.html")
 
 
@@ -444,8 +579,18 @@ async def start_search(request: Request, user: dict = Depends(get_current_user))
     if not search_query:
         raise HTTPException(status_code=400, detail="searchQuery is required")
 
-    # Always cap at 50 profiles
-    params["maxItems"] = 50
+    # ── Monthly usage limit check (plan-based) ─────────────────
+    plan  = get_user_plan(user["email"])
+    limit = get_plan_limit(plan)
+    used  = get_monthly_analyzed(user["email"])
+    if used >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Monthly limit reached ({used}/{limit}) on your {plan.title()} plan. Upgrade or wait for next month."
+        )
+
+    # Cap maxItems from system settings
+    params["maxItems"] = get_setting("max_items", 50)
 
     job_id = str(uuid.uuid4())[:8]
     jobs[job_id] = {
@@ -481,6 +626,79 @@ async def get_progress(job_id: str):
     return job
 
 
+# ─── Plan System ───────────────────────────────────────────────
+PLAN_LIMITS = {"starter": 25, "growth": 50, "pro": 100}
+DEFAULT_PLAN = "growth"
+
+
+def get_setting(key: str, default):
+    """Read a system setting from MongoDB."""
+    if db is None:
+        return default
+    doc = db.settings.find_one({"key": key})
+    return doc["value"] if doc else default
+
+
+def get_user_plan(email: str) -> str:
+    if db is None:
+        return DEFAULT_PLAN
+    u = db.users.find_one({"email": email}, {"plan": 1})
+    return (u or {}).get("plan", DEFAULT_PLAN)
+
+
+def get_plan_limit(plan: str) -> int:
+    return PLAN_LIMITS.get(plan, PLAN_LIMITS[DEFAULT_PLAN])
+
+
+def get_monthly_analyzed(email: str) -> int:
+    """Sum analyzed_count for the current calendar month."""
+    if db is None:
+        return 0
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    result = db.cycles.aggregate([
+        {"$match": {"user_email": email, "completed_at": {"$gte": month_start}}},
+        {"$group": {"_id": None, "total": {"$sum": "$analyzed_count"}}}
+    ])
+    row = next(result, None)
+    return row["total"] if row else 0
+
+
+@app.get("/api/usage")
+async def get_usage(user: dict = Depends(get_current_user)):
+    """Return current user's monthly usage, plan and limit."""
+    plan  = get_user_plan(user["email"])
+    limit = get_plan_limit(plan)
+    used  = get_monthly_analyzed(user["email"])
+    return {
+        "used":      used,
+        "limit":     limit,
+        "remaining": max(0, limit - used),
+        "plan":      plan,
+    }
+
+
+@app.get("/api/profile")
+async def get_profile(user: dict = Depends(get_current_user)):
+    """Return current user's profile info, plan and monthly usage."""
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    u = db.users.find_one({"email": user["email"]}, {"_id": 0, "name": 1, "email": 1, "plan": 1, "created_at": 1})
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    plan  = u.get("plan", DEFAULT_PLAN)
+    limit = get_plan_limit(plan)
+    used  = get_monthly_analyzed(user["email"])
+    return {
+        "name":      u["name"],
+        "email":     u["email"],
+        "plan":      plan,
+        "used":      used,
+        "limit":     limit,
+        "remaining": max(0, limit - used),
+    }
+
+
 @app.post("/api/search/{job_id}/select")
 async def select_profiles(job_id: str, request: Request, user: dict = Depends(get_current_user)):
     """Submit selected profile URLs to trigger post scraping + analysis.
@@ -494,12 +712,24 @@ async def select_profiles(job_id: str, request: Request, user: dict = Depends(ge
     if job["phase"] not in ("awaiting_selection", "complete"):
         raise HTTPException(status_code=400, detail=f"Cannot start Phase 2 — job is in '{job['phase']}' phase")
 
+    # ── Usage limit check (monthly, plan-based) ────────────────
+    plan      = get_user_plan(user["email"])
+    limit     = get_plan_limit(plan)
+    used      = get_monthly_analyzed(user["email"])
+    remaining = max(0, limit - used)
+    if remaining == 0:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Monthly limit reached ({used}/{limit}) on your {plan.title()} plan. Upgrade or wait for next month."
+        )
+
     body = await request.json()
     selected_urls = body.get("linkedin_urls", [])
     if not selected_urls:
         raise HTTPException(status_code=400, detail="No profiles selected")
 
-    selected_urls = selected_urls[:25]
+    # Cap selection to remaining quota
+    selected_urls = selected_urls[:min(25, remaining)]
 
     if job["phase"] == "complete":
         job["analyzed_profiles"] = []

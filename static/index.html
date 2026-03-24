@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LinkedIn Lead Intelligence</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #2d3436; min-height: 100vh; }
@@ -437,6 +438,7 @@
           <strong>Filter</strong> with precision &nbsp;&middot;&nbsp;
           <strong>Analyze</strong> what matters
         </p>
+        <div id="usageBadge" style="font-size:0.75rem;margin-top:6px;opacity:0.8"></div>
       </div>
       <div class="banner-right">
         <div class="banner-logo">
@@ -507,6 +509,10 @@
 
     <div class="form-actions">
       <button class="btn-primary" id="searchBtn" onclick="startSearch()">Search</button>
+      <button class="btn-secondary" id="clearBtn" onclick="clearAndSearchAgain()" style="display:none;margin-left:10px;background:#f8f9fa;color:#636e72;border:1px solid #e0e3ea;padding:10px 20px;border-radius:8px;font-size:0.9rem;font-weight:600;cursor:pointer" title="Clear fields and start a new search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;vertical-align:-1px"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        New Search
+      </button>
     </div>
   </div>
 
@@ -920,6 +926,46 @@
     document.getElementById('searchBtn').disabled = !queryOk;
   }
 
+  // ─── CLEAR & SEARCH AGAIN ────────────────────────────────
+  function clearAndSearchAgain() {
+    // Clear search query
+    document.getElementById('searchQuery').value = '';
+
+    // Clear all tag fields
+    for (const key of Object.keys(tagData)) {
+      tagData[key] = [];
+    }
+    document.querySelectorAll('.tag-input-wrap').forEach(wrap => {
+      const input = wrap.querySelector('.tag-input');
+      renderTags(input.dataset.field, wrap);
+    });
+
+    // Clear all multi-select fields
+    for (const key of Object.keys(msData)) {
+      msData[key] = [];
+    }
+    document.querySelectorAll('.ms-opt.selected').forEach(opt => opt.classList.remove('selected'));
+    document.querySelectorAll('.ms-trigger').forEach(t => { t.textContent = t.dataset.placeholder || 'Select…'; });
+
+    // Clear toggle
+    document.getElementById('toggleRecentJob').classList.remove('on');
+
+    // Reset UI: hide results/pipeline, show search form
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    document.getElementById('pipeline').style.display = 'none';
+    document.getElementById('resultsSection').style.display = 'none';
+    const ss = document.getElementById('selectionSection');
+    if (ss) ss.style.display = 'none';
+    const fds = document.getElementById('floatingDeepSearch');
+    if (fds) fds.classList.remove('visible');
+
+    hideStatus();
+    document.getElementById('searchBtn').style.display = '';
+    document.getElementById('clearBtn').style.display = 'none';
+    validateForm();
+    document.getElementById('searchQuery').focus();
+  }
+
   // ─── MAIN SEARCH FLOW ────────────────────────────────────
   async function startSearch() {
     const data = gatherFormData();
@@ -946,6 +992,14 @@
         body: JSON.stringify(data),
       });
       if (handleAuthError(res)) { btn.disabled = false; btn.textContent = 'Search'; return; }
+      if (res.status === 429) {
+        const err = await res.json();
+        hideStatus(); stopMessages();
+        showError(err.detail || 'Search limit reached. Please contact support to upgrade your plan.');
+        btn.disabled = false; btn.textContent = 'Search';
+        loadUsage();
+        return;
+      }
       const result = await res.json();
       jobId = result.job_id;
       // Persist immediately so a browser refresh can reconnect to this job
@@ -1039,6 +1093,7 @@
       btn.style.display = '';
       btn.disabled = false;
       btn.textContent = 'Search';
+      document.getElementById('clearBtn').style.display = 'none';
       document.getElementById('floatingDeepSearch').classList.remove('visible');
       return;
     }
@@ -1067,8 +1122,9 @@
       try { localStorage.setItem('leadIntelSelectionData', JSON.stringify(selectionData)); } catch(e) {}
       renderSelection(job.profiles_with_email, job.profiles_without_email);
 
-      // Hide search button, show floating Deep Search button
+      // Hide search button, show floating Deep Search button + New Search
       btn.style.display = 'none';
+      document.getElementById('clearBtn').style.display = '';
       document.getElementById('floatingDeepSearch').classList.add('visible');
 
       return;
@@ -1155,6 +1211,7 @@
         btn.style.display = '';
         btn.disabled = false;
         btn.textContent = 'Search';
+        document.getElementById('clearBtn').style.display = '';
         document.getElementById('floatingDeepSearch').classList.remove('visible');
       });
     }
@@ -1242,11 +1299,21 @@
         body: JSON.stringify({linkedin_urls: urls}),
       });
       if (handleAuthError(res)) return;
+      if (res.status === 429) {
+        const err = await res.json();
+        hideStatus();
+        document.getElementById('selectionSection').classList.add('visible');
+        document.getElementById('floatingDeepSearch').classList.add('visible');
+        showError(err.detail || 'Deep search limit reached. Please contact support.');
+        loadUsage();
+        return;
+      }
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.detail || 'Failed to start post scraping');
       }
       startPolling();
+      loadUsage();
     } catch (e) {
       hideStatus();
       document.getElementById('selectionSection').classList.add('visible');
@@ -1764,8 +1831,9 @@
           setPipeline(3);
           renderSelection(job.profiles_with_email, job.profiles_without_email);
 
-          // Hide search button, show floating Deep Search button
+          // Hide search button, show floating Deep Search button + New Search
           btn.style.display = 'none';
+          document.getElementById('clearBtn').style.display = '';
           document.getElementById('floatingDeepSearch').classList.add('visible');
 
           return;
@@ -1821,6 +1889,7 @@
       document.getElementById('pipeline').classList.add('visible');
       setPipeline(6, true);
       renderResults(cache.analyzed);
+      document.getElementById('clearBtn').style.display = '';
     } catch (e) {}
   }
 
@@ -1975,6 +2044,30 @@
     clearAuthErrors();
   }
 
+  async function loadUsage() {
+    try {
+      const res = await authFetch('/api/usage');
+      if (!res.ok) return;
+      const data = await res.json();
+      const el = document.getElementById('usageBadge');
+      if (!el) return;
+      const planLabel = { starter: 'Starter', growth: 'Growth', pro: 'Pro' }[data.plan] || 'Growth';
+      const planColor = { starter: '#2563eb', growth: '#16a34a', pro: '#7c3aed' }[data.plan] || '#16a34a';
+      const pct = data.limit > 0 ? Math.min(100, Math.round((data.used / data.limit) * 100)) : 0;
+      const barColor = pct >= 85 ? '#e74c3c' : pct >= 60 ? '#f39c12' : '#27ae60';
+      const textColor = data.remaining === 0 ? '#e74c3c' : data.remaining <= 5 ? '#f39c12' : 'rgba(255,255,255,0.9)';
+      el.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="background:${planColor};color:#fff;border-radius:4px;padding:1px 7px;font-size:0.68rem;font-weight:700">${planLabel}</span>
+          <span style="color:${textColor};font-size:0.73rem;font-weight:500">${data.used} / ${data.limit} profiles this month</span>
+        </div>
+        <div style="margin-top:5px;width:200px;max-width:100%;background:rgba(255,255,255,0.2);border-radius:6px;height:5px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${barColor};border-radius:6px;transition:width 0.4s ease"></div>
+        </div>
+      `;
+    } catch(e) {}
+  }
+
   function showApp() {
     document.getElementById('authOverlay').style.display = 'none';
     document.getElementById('mainApp').style.display = '';
@@ -1982,6 +2075,7 @@
       const firstName = currentUser.name.split(' ')[0];
       document.getElementById('bannerUserName').textContent = firstName;
     }
+    loadUsage();
 
     // Clear stale cache if it belongs to a different user
     try {
@@ -2021,13 +2115,7 @@
     const searchBtn = document.getElementById('searchBtn');
     if (searchBtn) { searchBtn.style.display = ''; searchBtn.disabled = false; searchBtn.textContent = 'Search'; }
 
-    // Reset auth button
-    const siBtn = document.getElementById('siBtn');
-    if (siBtn) { siBtn.disabled = false; siBtn.textContent = 'Sign In'; }
-    clearAuthErrors();
-
-    document.getElementById('authOverlay').style.display = 'flex';
-    document.getElementById('mainApp').style.display = 'none';
+    window.location.href = '/';
   }
 
   // Check saved session on page open

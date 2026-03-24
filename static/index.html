@@ -437,6 +437,7 @@
           <strong>Filter</strong> with precision &nbsp;&middot;&nbsp;
           <strong>Analyze</strong> what matters
         </p>
+        <div id="usageBadge" style="font-size:0.75rem;margin-top:6px;opacity:0.8"></div>
       </div>
       <div class="banner-right">
         <div class="banner-logo">
@@ -1242,11 +1243,21 @@
         body: JSON.stringify({linkedin_urls: urls}),
       });
       if (handleAuthError(res)) return;
+      if (res.status === 429) {
+        const err = await res.json();
+        hideStatus();
+        document.getElementById('selectionSection').classList.add('visible');
+        document.getElementById('floatingDeepSearch').classList.add('visible');
+        showError(err.detail || 'Deep search limit reached. Please contact support.');
+        loadUsage();
+        return;
+      }
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.detail || 'Failed to start post scraping');
       }
       startPolling();
+      loadUsage();
     } catch (e) {
       hideStatus();
       document.getElementById('selectionSection').classList.add('visible');
@@ -1975,6 +1986,18 @@
     clearAuthErrors();
   }
 
+  async function loadUsage() {
+    try {
+      const res = await authFetch('/api/usage');
+      if (!res.ok) return;
+      const data = await res.json();
+      const el = document.getElementById('usageBadge');
+      if (!el) return;
+      el.textContent = `${data.used} / ${data.limit} deep searches used`;
+      el.style.color = data.remaining === 0 ? '#e17055' : data.remaining <= 10 ? '#f39c12' : '#636e72';
+    } catch(e) {}
+  }
+
   function showApp() {
     document.getElementById('authOverlay').style.display = 'none';
     document.getElementById('mainApp').style.display = '';
@@ -1982,6 +2005,7 @@
       const firstName = currentUser.name.split(' ')[0];
       document.getElementById('bannerUserName').textContent = firstName;
     }
+    loadUsage();
 
     // Clear stale cache if it belongs to a different user
     try {

@@ -164,6 +164,28 @@ async def admin_get_searches(request: Request):
     return cycles
 
 
+@app.get("/api/admin/usage")
+async def admin_get_usage(request: Request):
+    """Admin views deep search usage per user."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    DEEP_SEARCH_LIMIT = 50
+    users = list(db.users.find({}, {"_id": 0, "email": 1, "name": 1}))
+    result = []
+    for u in users:
+        used = db.cycles.count_documents({"user_email": u["email"]})
+        result.append({
+            "email":     u["email"],
+            "name":      u.get("name", ""),
+            "used":      used,
+            "limit":     DEEP_SEARCH_LIMIT,
+            "remaining": max(0, DEEP_SEARCH_LIMIT - used),
+        })
+    result.sort(key=lambda x: x["used"], reverse=True)
+    return result
+
+
 @app.get("/api/admin/costs")
 async def admin_get_costs(request: Request):
     """Admin views cost summary per user and overall totals."""
@@ -481,6 +503,18 @@ async def get_progress(job_id: str):
     return job
 
 
+@app.get("/api/usage")
+async def get_usage(user: dict = Depends(get_current_user)):
+    """Return current user's deep search usage vs limit."""
+    DEEP_SEARCH_LIMIT = 50
+    used = db.cycles.count_documents({"user_email": user["email"]}) if db is not None else 0
+    return {
+        "used":      used,
+        "limit":     DEEP_SEARCH_LIMIT,
+        "remaining": max(0, DEEP_SEARCH_LIMIT - used),
+    }
+
+
 @app.post("/api/search/{job_id}/select")
 async def select_profiles(job_id: str, request: Request, user: dict = Depends(get_current_user)):
     """Submit selected profile URLs to trigger post scraping + analysis.
@@ -493,6 +527,16 @@ async def select_profiles(job_id: str, request: Request, user: dict = Depends(ge
         raise HTTPException(status_code=404, detail="Job not found")
     if job["phase"] not in ("awaiting_selection", "complete"):
         raise HTTPException(status_code=400, detail=f"Cannot start Phase 2 — job is in '{job['phase']}' phase")
+
+    # ── Usage limit check ──────────────────────────────────────
+    DEEP_SEARCH_LIMIT = 50
+    if db is not None:
+        used = db.cycles.count_documents({"user_email": user["email"]})
+        if used >= DEEP_SEARCH_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Deep search limit reached ({DEEP_SEARCH_LIMIT}/{DEEP_SEARCH_LIMIT}). Please contact support to upgrade your plan."
+            )
 
     body = await request.json()
     selected_urls = body.get("linkedin_urls", [])

@@ -2001,8 +2001,10 @@
       const data = await res.json();
       const el = document.getElementById('usageBadge');
       if (!el) return;
-      el.textContent = `${data.used} / ${data.limit} deep searches used`;
-      el.style.color = data.remaining === 0 ? '#e17055' : data.remaining <= 10 ? '#f39c12' : '#636e72';
+      const planLabel = { starter: 'Starter', growth: 'Growth', pro: 'Pro' }[data.plan] || 'Growth';
+      const planColor = { starter: '#2563eb', growth: '#16a34a', pro: '#7c3aed' }[data.plan] || '#16a34a';
+      el.innerHTML = `<span style="background:${planColor};color:#fff;border-radius:4px;padding:1px 7px;font-size:0.68rem;font-weight:700;margin-right:6px">${planLabel}</span>${data.used} / ${data.limit} profiles this month`;
+      el.style.color = data.remaining === 0 ? '#e17055' : data.remaining <= 5 ? '#f39c12' : '#636e72';
     } catch(e) {}
   }
 
@@ -2053,13 +2055,7 @@
     const searchBtn = document.getElementById('searchBtn');
     if (searchBtn) { searchBtn.style.display = ''; searchBtn.disabled = false; searchBtn.textContent = 'Search'; }
 
-    // Reset auth button
-    const siBtn = document.getElementById('siBtn');
-    if (siBtn) { siBtn.disabled = false; siBtn.textContent = 'Sign In'; }
-    clearAuthErrors();
-
-    document.getElementById('authOverlay').style.display = 'flex';
-    document.getElementById('mainApp').style.display = 'none';
+    window.location.href = '/';
   }
 
   // Check saved session on page open

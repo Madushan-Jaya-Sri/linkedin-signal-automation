@@ -80,6 +80,29 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba
 .step-title { font-size: 0.88rem; font-weight: 700; color: var(--dark); margin-bottom: 6px; }
 .step-desc { font-size: 0.78rem; color: var(--soft); line-height: 1.5; }
 
+/* ── PRICING ─────────────────────────────────────── */
+.pricing { padding: 80px 24px; background: var(--bg); }
+.pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; max-width: 900px; margin: 0 auto; }
+.price-card { background: var(--white); border: 1.5px solid var(--border); border-radius: 18px; padding: 32px 28px; position: relative; transition: all 0.2s; }
+.price-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,0.08); }
+.price-card.popular { background: linear-gradient(135deg, #4f46e5, #7c3aed); border-color: transparent; }
+.price-popular-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #f59e0b; color: #fff; font-size: 0.7rem; font-weight: 800; padding: 3px 14px; border-radius: 20px; white-space: nowrap; letter-spacing: 0.5px; text-transform: uppercase; }
+.price-plan { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: var(--brand); margin-bottom: 8px; }
+.price-card.popular .price-plan { color: rgba(255,255,255,0.7); }
+.price-amount { font-size: 2.6rem; font-weight: 900; color: var(--dark); line-height: 1; margin-bottom: 8px; }
+.price-amount span { font-size: 1rem; font-weight: 500; color: var(--soft); }
+.price-card.popular .price-amount { color: #fff; }
+.price-card.popular .price-amount span { color: rgba(255,255,255,0.6); }
+.price-desc { font-size: 0.82rem; color: var(--soft); margin-bottom: 24px; line-height: 1.6; }
+.price-card.popular .price-desc { color: rgba(255,255,255,0.7); }
+.price-features { list-style: none; margin-bottom: 28px; display: flex; flex-direction: column; gap: 10px; }
+.price-features li { display: flex; align-items: center; gap: 8px; font-size: 0.83rem; color: var(--mid); }
+.price-card.popular .price-features li { color: rgba(255,255,255,0.9); }
+.price-btn { width: 100%; padding: 11px; border-radius: 9px; border: 1.5px solid var(--brand); background: var(--brand-light); color: var(--brand); font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+.price-btn:hover { background: var(--brand); color: #fff; }
+.popular-btn { background: rgba(255,255,255,0.15) !important; border-color: rgba(255,255,255,0.4) !important; color: #fff !important; }
+.popular-btn:hover { background: rgba(255,255,255,0.25) !important; }
+
 /* ── CTA BANNER ───────────────── */
 .cta-banner { padding: 72px 24px; background: linear-gradient(135deg, #4f46e5, #7c3aed); text-align: center; }
 .cta-title { font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 800; color: #fff; margin-bottom: 12px; }
@@ -264,6 +287,65 @@ footer span { color: #6366f1; font-weight: 600; }
         <div class="step-desc">Copy emails, generate AI outreach drafts, or export the full list to CSV.</div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing" id="pricing">
+  <div class="section-inner">
+    <div class="section-eyebrow">Pricing</div>
+    <h2 class="section-title">Simple, transparent plans</h2>
+    <p class="section-sub">Monthly plans. Reset every month. Upgrade anytime.</p>
+    <div class="pricing-grid">
+
+      <!-- Starter -->
+      <div class="price-card">
+        <div class="price-plan">Starter</div>
+        <div class="price-amount">$9<span>/mo</span></div>
+        <div class="price-desc">Perfect for individuals just getting started with LinkedIn prospecting.</div>
+        <ul class="price-features">
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> 25 analyzed profiles / month</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> AI relevance scoring</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Email extraction</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> CSV export</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Search history</li>
+        </ul>
+        <button class="price-btn" onclick="openModal('signup')">Get Started</button>
+      </div>
+
+      <!-- Growth (Popular) -->
+      <div class="price-card popular">
+        <div class="price-popular-badge">Most Popular</div>
+        <div class="price-plan">Growth</div>
+        <div class="price-amount">$19<span>/mo</span></div>
+        <div class="price-desc">For sales teams and recruiters who need more volume each month.</div>
+        <ul class="price-features">
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <strong>50 analyzed profiles / month</strong></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> AI relevance scoring</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Email extraction</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> AI outreach drafts</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> CSV export + history</li>
+        </ul>
+        <button class="price-btn popular-btn" onclick="openModal('signup')">Get Started</button>
+      </div>
+
+      <!-- Pro -->
+      <div class="price-card">
+        <div class="price-plan">Pro</div>
+        <div class="price-amount">$39<span>/mo</span></div>
+        <div class="price-desc">For power users and agencies with high prospecting demands.</div>
+        <ul class="price-features">
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <strong>100 analyzed profiles / month</strong></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> AI relevance scoring</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Email extraction</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> AI outreach drafts + chat</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Priority support</li>
+        </ul>
+        <button class="price-btn" onclick="openModal('signup')">Get Started</button>
+      </div>
+
+    </div>
+    <p style="text-align:center;font-size:0.8rem;color:#94a3b8;margin-top:24px">All plans include admin approval. Monthly limits reset on the 1st of each month.</p>
   </div>
 </section>
 

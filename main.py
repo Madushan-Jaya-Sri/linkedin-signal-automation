@@ -203,23 +203,64 @@ async def admin_get_searches(request: Request):
 
 @app.get("/api/admin/usage")
 async def admin_get_usage(request: Request):
-    """Admin views total analyzed profiles per user vs limit."""
+    """Admin views monthly analyzed profiles per user vs plan limit."""
     require_admin(request)
     if db is None:
         raise HTTPException(status_code=503, detail="Database not configured")
-    users = list(db.users.find({}, {"_id": 0, "email": 1, "name": 1}))
+    users = list(db.users.find({}, {"_id": 0, "email": 1, "name": 1, "plan": 1}))
     result = []
     for u in users:
-        used = get_total_analyzed(u["email"])
+        plan  = u.get("plan", DEFAULT_PLAN)
+        limit = get_plan_limit(plan)
+        used  = get_monthly_analyzed(u["email"])
         result.append({
             "email":     u["email"],
             "name":      u.get("name", ""),
+            "plan":      plan,
             "used":      used,
-            "limit":     ANALYZED_PROFILE_LIMIT,
-            "remaining": max(0, ANALYZED_PROFILE_LIMIT - used),
+            "limit":     limit,
+            "remaining": max(0, limit - used),
         })
     result.sort(key=lambda x: x["used"], reverse=True)
     return result
+
+
+@app.get("/api/admin/settings")
+async def admin_get_settings(request: Request):
+    """Get system settings."""
+    require_admin(request)
+    return {
+        "max_items": get_setting("max_items", 50),
+        "max_posts":  get_setting("max_posts",  10),
+    }
+
+
+@app.put("/api/admin/settings")
+async def admin_update_settings(request: Request):
+    """Update system settings."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    body = await request.json()
+    for key in ["max_items", "max_posts"]:
+        if key in body:
+            val = int(body[key])
+            db.settings.update_one({"key": key}, {"$set": {"key": key, "value": val}}, upsert=True)
+    return {"ok": True}
+
+
+@app.put("/api/admin/users/{email}/plan")
+async def admin_set_user_plan(email: str, request: Request):
+    """Set a user's subscription plan."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    body = await request.json()
+    plan = body.get("plan", DEFAULT_PLAN)
+    if plan not in PLAN_LIMITS:
+        raise HTTPException(status_code=400, detail=f"Invalid plan. Choose: {list(PLAN_LIMITS.keys())}")
+    db.users.update_one({"email": email.lower()}, {"$set": {"plan": plan}})
+    return {"ok": True}
 
 
 @app.get("/api/admin/costs")
@@ -462,7 +503,7 @@ def _run_phase2(job_id: str, selected_urls: list[str]):
     for i, profile in enumerate(selected):
         job["current_profile_name"] = profile.get("name", "Unknown")
         try:
-            posts = scrape_posts(profile["linkedin_url"], max_posts=20)
+            posts = scrape_posts(profile["linkedin_url"], max_posts=get_setting("max_posts", 10))
             profile["posts"] = posts
         except Exception as e:
             print(f"[WARN] Failed to scrape posts for {profile.get('name')}: {e}")
@@ -538,16 +579,18 @@ async def start_search(request: Request, user: dict = Depends(get_current_user))
     if not search_query:
         raise HTTPException(status_code=400, detail="searchQuery is required")
 
-    # ── Usage limit check ──────────────────────────────────────
-    used = get_total_analyzed(user["email"])
-    if used >= ANALYZED_PROFILE_LIMIT:
+    # ── Monthly usage limit check (plan-based) ─────────────────
+    plan  = get_user_plan(user["email"])
+    limit = get_plan_limit(plan)
+    used  = get_monthly_analyzed(user["email"])
+    if used >= limit:
         raise HTTPException(
             status_code=429,
-            detail=f"Profile search limit reached ({used}/{ANALYZED_PROFILE_LIMIT}). Please contact support to upgrade your plan."
+            detail=f"Monthly limit reached ({used}/{limit}) on your {plan.title()} plan. Upgrade or wait for next month."
         )
 
-    # Always cap at 50 profiles
-    params["maxItems"] = 50
+    # Cap maxItems from system settings
+    params["maxItems"] = get_setting("max_items", 50)
 
     job_id = str(uuid.uuid4())[:8]
     jobs[job_id] = {
@@ -583,14 +626,38 @@ async def get_progress(job_id: str):
     return job
 
 
-ANALYZED_PROFILE_LIMIT = 50
+# ─── Plan System ───────────────────────────────────────────────
+PLAN_LIMITS = {"starter": 25, "growth": 50, "pro": 100}
+DEFAULT_PLAN = "growth"
 
-def get_total_analyzed(email: str) -> int:
-    """Sum analyzed_count across all cycles for a user."""
+
+def get_setting(key: str, default):
+    """Read a system setting from MongoDB."""
+    if db is None:
+        return default
+    doc = db.settings.find_one({"key": key})
+    return doc["value"] if doc else default
+
+
+def get_user_plan(email: str) -> str:
+    if db is None:
+        return DEFAULT_PLAN
+    u = db.users.find_one({"email": email}, {"plan": 1})
+    return (u or {}).get("plan", DEFAULT_PLAN)
+
+
+def get_plan_limit(plan: str) -> int:
+    return PLAN_LIMITS.get(plan, PLAN_LIMITS[DEFAULT_PLAN])
+
+
+def get_monthly_analyzed(email: str) -> int:
+    """Sum analyzed_count for the current calendar month."""
     if db is None:
         return 0
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     result = db.cycles.aggregate([
-        {"$match": {"user_email": email}},
+        {"$match": {"user_email": email, "completed_at": {"$gte": month_start}}},
         {"$group": {"_id": None, "total": {"$sum": "$analyzed_count"}}}
     ])
     row = next(result, None)
@@ -599,12 +666,36 @@ def get_total_analyzed(email: str) -> int:
 
 @app.get("/api/usage")
 async def get_usage(user: dict = Depends(get_current_user)):
-    """Return current user's total analyzed profiles vs limit."""
-    used = get_total_analyzed(user["email"])
+    """Return current user's monthly usage, plan and limit."""
+    plan  = get_user_plan(user["email"])
+    limit = get_plan_limit(plan)
+    used  = get_monthly_analyzed(user["email"])
     return {
         "used":      used,
-        "limit":     ANALYZED_PROFILE_LIMIT,
-        "remaining": max(0, ANALYZED_PROFILE_LIMIT - used),
+        "limit":     limit,
+        "remaining": max(0, limit - used),
+        "plan":      plan,
+    }
+
+
+@app.get("/api/profile")
+async def get_profile(user: dict = Depends(get_current_user)):
+    """Return current user's profile info, plan and monthly usage."""
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    u = db.users.find_one({"email": user["email"]}, {"_id": 0, "name": 1, "email": 1, "plan": 1, "created_at": 1})
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    plan  = u.get("plan", DEFAULT_PLAN)
+    limit = get_plan_limit(plan)
+    used  = get_monthly_analyzed(user["email"])
+    return {
+        "name":      u["name"],
+        "email":     u["email"],
+        "plan":      plan,
+        "used":      used,
+        "limit":     limit,
+        "remaining": max(0, limit - used),
     }
 
 
@@ -621,13 +712,15 @@ async def select_profiles(job_id: str, request: Request, user: dict = Depends(ge
     if job["phase"] not in ("awaiting_selection", "complete"):
         raise HTTPException(status_code=400, detail=f"Cannot start Phase 2 — job is in '{job['phase']}' phase")
 
-    # ── Usage limit check ──────────────────────────────────────
-    used = get_total_analyzed(user["email"])
-    remaining = max(0, ANALYZED_PROFILE_LIMIT - used)
+    # ── Usage limit check (monthly, plan-based) ────────────────
+    plan      = get_user_plan(user["email"])
+    limit     = get_plan_limit(plan)
+    used      = get_monthly_analyzed(user["email"])
+    remaining = max(0, limit - used)
     if remaining == 0:
         raise HTTPException(
             status_code=429,
-            detail=f"Analyzed profile limit reached ({ANALYZED_PROFILE_LIMIT}/{ANALYZED_PROFILE_LIMIT}). Please contact support to upgrade your plan."
+            detail=f"Monthly limit reached ({used}/{limit}) on your {plan.title()} plan. Upgrade or wait for next month."
         )
 
     body = await request.json()

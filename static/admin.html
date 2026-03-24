@@ -180,6 +180,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .activity-text strong { color: #0f172a; }
 .activity-time { font-size: 0.72rem; color: #94a3b8; flex-shrink: 0; }
 
+/* ── COST TRACKER ────────────────────────────── */
+.cost-summary { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 20px; }
+.cost-card { background: #fff; border-radius: 14px; padding: 20px; border: 1px solid #e2e8f0; }
+.cost-card.total { background: linear-gradient(135deg,#0f172a,#1e3a5f); border-color: transparent; }
+.cost-card.total .cost-card-label { color: rgba(255,255,255,0.6); }
+.cost-card.total .cost-card-value { color: #fff; }
+.cost-card.total .cost-card-sub { color: rgba(255,255,255,0.4); }
+.cost-card-label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.cost-card-value { font-size: 1.6rem; font-weight: 800; color: #0f172a; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+.cost-card-sub { font-size: 0.68rem; color: #94a3b8; }
+.pill-blue { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+
 /* ── SEARCH ACTIVITY TWO-PANEL ──────────────── */
 .sa-layout { display: flex; gap: 0; background: #fff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; min-height: 520px; }
 .sa-users { width: 260px; flex-shrink: 0; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; }
@@ -297,6 +309,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           Search Activity
           <span class="sb-badge" id="sb-search-count">0</span>
+        </div>
+        <div class="sb-item" onclick="navigate('costs')" id="nav-costs">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Cost Tracker
         </div>
       </div>
 
@@ -454,6 +470,85 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
             </div>
             <div class="card-body">
               <div class="search-list" id="userDetailSearches"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── COST TRACKER PAGE ── -->
+        <div class="page" id="page-costs">
+          <!-- Summary cards -->
+          <div class="cost-summary" id="costSummary">
+            <div class="cost-card total">
+              <div class="cost-card-label">Total Spend</div>
+              <div class="cost-card-value" id="cost-total">—</div>
+              <div class="cost-card-sub">all users · all time</div>
+            </div>
+            <div class="cost-card">
+              <div class="cost-card-label">Apify Phase 1</div>
+              <div class="cost-card-value" id="cost-phase1">—</div>
+              <div class="cost-card-sub">profile scraping · $0.80/cycle</div>
+            </div>
+            <div class="cost-card">
+              <div class="cost-card-label">Apify Phase 2</div>
+              <div class="cost-card-value" id="cost-phase2">—</div>
+              <div class="cost-card-sub">post scraping · $0.10/profile</div>
+            </div>
+            <div class="cost-card">
+              <div class="cost-card-label">OpenAI</div>
+              <div class="cost-card-value" id="cost-openai">—</div>
+              <div class="cost-card-sub">AI analysis · $0.50/cycle</div>
+            </div>
+          </div>
+
+          <!-- Per-user cost table -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-head-title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                Cost Per User
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="loadCosts()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Refresh
+              </button>
+            </div>
+            <div class="card-body">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Cycles</th>
+                    <th>Apify P1</th>
+                    <th>Apify P2</th>
+                    <th>OpenAI</th>
+                    <th>Total Cost</th>
+                  </tr>
+                </thead>
+                <tbody id="costsBody">
+                  <tr class="empty-row"><td colspan="6">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Cost breakdown info -->
+          <div class="card" style="background:#f8fafc">
+            <div class="card-head">
+              <div class="card-head-title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Pricing Breakdown
+              </div>
+            </div>
+            <div class="card-body">
+              <table class="data-table">
+                <thead><tr><th>Component</th><th>Rate</th><th>Notes</th></tr></thead>
+                <tbody>
+                  <tr><td>Apify Phase 1</td><td><span class="pill pill-blue">$0.80 / cycle</span></td><td style="color:#64748b;font-size:0.8rem">Up to 50 LinkedIn profiles scraped</td></tr>
+                  <tr><td>Apify Phase 2</td><td><span class="pill pill-blue">$0.10 / profile</span></td><td style="color:#64748b;font-size:0.8rem">Post scraping (20 posts/profile, max 25 selected)</td></tr>
+                  <tr><td>OpenAI Analysis</td><td><span class="pill pill-blue">$0.50 / cycle</span></td><td style="color:#64748b;font-size:0.8rem">GPT-4 relevance scoring + outreach drafts</td></tr>
+                  <tr><td>Hosting (EC2)</td><td><span class="pill pill-gray">$20 / month</span></td><td style="color:#64748b;font-size:0.8rem">Shared infrastructure — not tracked per user</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -715,9 +810,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         }).join('');
       const emailCount = c.profiles_with_email_count || 0;
       const analyzed = c.analyzed_count || 0;
+      const costStr = c.cost ? ` &nbsp;·&nbsp; <span style="color:#16a34a;font-weight:600">$${c.cost.total.toFixed(2)}</span>` : '';
       return `<div class="sq-item">
         <div class="sq-item-query">${esc(c.search_query || '—')}</div>
-        <div class="sq-item-meta">${new Date(c.completed_at).toLocaleString()} &nbsp;·&nbsp; ${analyzed} analyzed</div>
+        <div class="sq-item-meta">${new Date(c.completed_at).toLocaleString()} &nbsp;·&nbsp; ${analyzed} analyzed${costStr}</div>
         <div class="sq-item-row">
           <div class="sq-item-chips">${chips}</div>
           <div class="sq-item-actions">
@@ -798,8 +894,47 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     navigate('user-detail');
   }
 
+  // ── COST TRACKER ──────────────────────────────────
+  async function loadCosts() {
+    document.getElementById('costsBody').innerHTML = '<tr class="empty-row"><td colspan="6">Loading...</td></tr>';
+    ['cost-total','cost-phase1','cost-phase2','cost-openai'].forEach(id => document.getElementById(id).textContent = '—');
+    try {
+      const res = await adminFetch('/api/admin/costs');
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      document.getElementById('cost-total').textContent  = '$' + data.total_cost.toFixed(2);
+      const p1 = data.users.reduce((s,u) => s + u.apify_phase1, 0);
+      const p2 = data.users.reduce((s,u) => s + u.apify_phase2, 0);
+      const oa = data.users.reduce((s,u) => s + u.openai, 0);
+      document.getElementById('cost-phase1').textContent = '$' + p1.toFixed(2);
+      document.getElementById('cost-phase2').textContent = '$' + p2.toFixed(2);
+      document.getElementById('cost-openai').textContent = '$' + oa.toFixed(2);
+      const body = document.getElementById('costsBody');
+      if (!data.users.length) { body.innerHTML = '<tr class="empty-row"><td colspan="6">No cycles yet.</td></tr>'; return; }
+      body.innerHTML = data.users.map(u => {
+        const color = avatarColor(u.email);
+        const initials = u.email.slice(0,2).toUpperCase();
+        return `<tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="width:28px;height:28px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:0.62rem;font-weight:800;color:#fff;flex-shrink:0">${initials}</div>
+              <span style="font-size:0.82rem;font-weight:600;color:#0f172a">${esc(u.email)}</span>
+            </div>
+          </td>
+          <td><span class="pill pill-gray">${u.cycles}</span></td>
+          <td style="font-variant-numeric:tabular-nums">$${u.apify_phase1.toFixed(2)}</td>
+          <td style="font-variant-numeric:tabular-nums">$${u.apify_phase2.toFixed(2)}</td>
+          <td style="font-variant-numeric:tabular-nums">$${u.openai.toFixed(2)}</td>
+          <td><span class="pill pill-green" style="font-weight:700;font-size:0.78rem">$${u.total_cost.toFixed(2)}</span></td>
+        </tr>`;
+      }).join('');
+    } catch(e) {
+      document.getElementById('costsBody').innerHTML = '<tr class="empty-row"><td colspan="6">Failed to load costs.</td></tr>';
+    }
+  }
+
   // ── NAVIGATION ────────────────────────────────────
-  const PAGE_TITLES = { overview: 'Overview', users: 'Users', searches: 'Search Activity', 'user-detail': 'User Detail' };
+  const PAGE_TITLES = { overview: 'Overview', users: 'Users', searches: 'Search Activity', costs: 'Cost Tracker', 'user-detail': 'User Detail' };
   function navigate(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
@@ -807,6 +942,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     const navEl = document.getElementById('nav-' + page);
     if (navEl) navEl.classList.add('active');
     document.getElementById('topbarTitle').textContent = PAGE_TITLES[page] || page;
+    if (page === 'costs') loadCosts();
   }
 
   // ── CREATE USER ───────────────────────────────────

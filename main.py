@@ -465,6 +465,14 @@ async def start_search(request: Request, user: dict = Depends(get_current_user))
     if not search_query:
         raise HTTPException(status_code=400, detail="searchQuery is required")
 
+    # ── Usage limit check ──────────────────────────────────────
+    used = get_total_analyzed(user["email"])
+    if used >= ANALYZED_PROFILE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Profile search limit reached ({used}/{ANALYZED_PROFILE_LIMIT}). Please contact support to upgrade your plan."
+        )
+
     # Always cap at 50 profiles
     params["maxItems"] = 50
 

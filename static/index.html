@@ -947,6 +947,14 @@
         body: JSON.stringify(data),
       });
       if (handleAuthError(res)) { btn.disabled = false; btn.textContent = 'Search'; return; }
+      if (res.status === 429) {
+        const err = await res.json();
+        hideStatus(); stopMessages();
+        showError(err.detail || 'Search limit reached. Please contact support to upgrade your plan.');
+        btn.disabled = false; btn.textContent = 'Search';
+        loadUsage();
+        return;
+      }
       const result = await res.json();
       jobId = result.job_id;
       // Persist immediately so a browser refresh can reconnect to this job

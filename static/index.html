@@ -1831,8 +1831,9 @@
           setPipeline(3);
           renderSelection(job.profiles_with_email, job.profiles_without_email);
 
-          // Hide search button, show floating Deep Search button
+          // Hide search button, show floating Deep Search button + New Search
           btn.style.display = 'none';
+          document.getElementById('clearBtn').style.display = '';
           document.getElementById('floatingDeepSearch').classList.add('visible');
 
           return;
@@ -1888,6 +1889,7 @@
       document.getElementById('pipeline').classList.add('visible');
       setPipeline(6, true);
       renderResults(cache.analyzed);
+      document.getElementById('clearBtn').style.display = '';
     } catch (e) {}
   }
 

@@ -170,7 +170,7 @@ async def admin_get_costs(request: Request):
     require_admin(request)
     if db is None:
         raise HTTPException(status_code=503, detail="Database not configured")
-    cycles = list(db.cycles.find({}, {"user_email": 1, "cost": 1, "completed_at": 1, "analyzed_count": 1}))
+    cycles = list(db.cycles.find({}, {"_id": 0, "user_email": 1, "cost": 1, "completed_at": 1, "analyzed_count": 1}))
     user_costs = {}
     total_cost  = 0.0
     for c in cycles:

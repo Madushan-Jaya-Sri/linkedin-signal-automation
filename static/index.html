@@ -508,6 +508,10 @@
 
     <div class="form-actions">
       <button class="btn-primary" id="searchBtn" onclick="startSearch()">Search</button>
+      <button class="btn-secondary" id="clearBtn" onclick="clearAndSearchAgain()" style="display:none;margin-left:10px;background:#f8f9fa;color:#636e72;border:1px solid #e0e3ea;padding:10px 20px;border-radius:8px;font-size:0.9rem;font-weight:600;cursor:pointer" title="Clear fields and start a new search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;vertical-align:-1px"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        New Search
+      </button>
     </div>
   </div>
 
@@ -921,6 +925,46 @@
     document.getElementById('searchBtn').disabled = !queryOk;
   }
 
+  // ─── CLEAR & SEARCH AGAIN ────────────────────────────────
+  function clearAndSearchAgain() {
+    // Clear search query
+    document.getElementById('searchQuery').value = '';
+
+    // Clear all tag fields
+    for (const key of Object.keys(tagData)) {
+      tagData[key] = [];
+    }
+    document.querySelectorAll('.tag-input-wrap').forEach(wrap => {
+      const input = wrap.querySelector('.tag-input');
+      renderTags(input.dataset.field, wrap);
+    });
+
+    // Clear all multi-select fields
+    for (const key of Object.keys(msData)) {
+      msData[key] = [];
+    }
+    document.querySelectorAll('.ms-opt.selected').forEach(opt => opt.classList.remove('selected'));
+    document.querySelectorAll('.ms-trigger').forEach(t => { t.textContent = t.dataset.placeholder || 'Select…'; });
+
+    // Clear toggle
+    document.getElementById('toggleRecentJob').classList.remove('on');
+
+    // Reset UI: hide results/pipeline, show search form
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    document.getElementById('pipeline').style.display = 'none';
+    document.getElementById('resultsSection').style.display = 'none';
+    const ss = document.getElementById('selectionSection');
+    if (ss) ss.style.display = 'none';
+    const fds = document.getElementById('floatingDeepSearch');
+    if (fds) fds.classList.remove('visible');
+
+    hideStatus();
+    document.getElementById('searchBtn').style.display = '';
+    document.getElementById('clearBtn').style.display = 'none';
+    validateForm();
+    document.getElementById('searchQuery').focus();
+  }
+
   // ─── MAIN SEARCH FLOW ────────────────────────────────────
   async function startSearch() {
     const data = gatherFormData();
@@ -1048,6 +1092,7 @@
       btn.style.display = '';
       btn.disabled = false;
       btn.textContent = 'Search';
+      document.getElementById('clearBtn').style.display = 'none';
       document.getElementById('floatingDeepSearch').classList.remove('visible');
       return;
     }
@@ -1076,8 +1121,9 @@
       try { localStorage.setItem('leadIntelSelectionData', JSON.stringify(selectionData)); } catch(e) {}
       renderSelection(job.profiles_with_email, job.profiles_without_email);
 
-      // Hide search button, show floating Deep Search button
+      // Hide search button, show floating Deep Search button + New Search
       btn.style.display = 'none';
+      document.getElementById('clearBtn').style.display = '';
       document.getElementById('floatingDeepSearch').classList.add('visible');
 
       return;
@@ -1164,6 +1210,7 @@
         btn.style.display = '';
         btn.disabled = false;
         btn.textContent = 'Search';
+        document.getElementById('clearBtn').style.display = '';
         document.getElementById('floatingDeepSearch').classList.remove('visible');
       });
     }

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - staging
 
 jobs:
   deploy:
@@ -25,35 +26,42 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Set image tag
+        id: vars
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "image_tag=production" >> $GITHUB_OUTPUT
+          else
+            echo "image_tag=staging" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build, tag and push Docker image
         env:
           ECR_REGISTRY:   ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: linkedin-lead-intel
-          IMAGE_TAG:       ${{ github.sha }}
+          IMAGE_TAG:      ${{ steps.vars.outputs.image_tag }}
         run: |
           docker build --platform linux/amd64 --provenance=false \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} \
             .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
 
-      - name: Deploy to EC2
+      - name: Deploy to Production EC2
+        if: github.ref_name == 'main'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host:     ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key:      ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Login to ECR using instance IAM role
             aws ecr get-login-password --region us-east-2 \
               | docker login --username AWS --password-stdin \
                   905418118598.dkr.ecr.us-east-2.amazonaws.com
 
-            # Pull the new image
-            docker pull 905418118598.dkr.ecr.us-east-2.amazonaws.com/linkedin-lead-intel:latest
+            docker pull 905418118598.dkr.ecr.us-east-2.amazonaws.com/linkedin-lead-intel:production
 
-            # Swap containers with zero manual downtime
             docker stop linkedin-lead-intel 2>/dev/null || true
             docker rm   linkedin-lead-intel 2>/dev/null || true
 
@@ -62,9 +70,34 @@ jobs:
               --restart unless-stopped \
               -p 127.0.0.1:8080:8080 \
               --env-file /opt/linkedin-intel/.env \
-              905418118598.dkr.ecr.us-east-2.amazonaws.com/linkedin-lead-intel:latest
+              905418118598.dkr.ecr.us-east-2.amazonaws.com/linkedin-lead-intel:production
 
-            # Remove dangling images to save disk space
             docker image prune -f
+            echo "✅ Deployed to Production"
 
-            echo "✅ Deployed to EC2"
+      - name: Deploy to Staging EC2
+        if: github.ref_name == 'staging'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.STAGING_EC2_HOST }}
+          username: ${{ secrets.STAGING_EC2_USER }}
+          key:      ${{ secrets.STAGING_EC2_SSH_KEY }}
+          script: |
+            aws ecr get-login-password --region us-east-2 \
+              | docker login --username AWS --password-stdin \
+                  905418118598.dkr.ecr.us-east-2.amazonaws.com
+
+            docker pull 905418118598.dkr.ecr.us-east-2.amazonaws.com/linkedin-lead-intel:staging
+
+            docker stop linkedin-lead-intel 2>/dev/null || true
+            docker rm   linkedin-lead-intel 2>/dev/null || true
+
+            docker run -d \
+              --name linkedin-lead-intel \
+              --restart unless-stopped \
+              -p 127.0.0.1:8080:8080 \
+              --env-file /opt/linkedin-intel/.env \
+              905418118598.dkr.ecr.us-east-2.amazonaws.com/linkedin-lead-intel:staging
+
+            docker image prune -f
+            echo "✅ Deployed to Staging"

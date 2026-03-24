@@ -147,6 +147,91 @@ async def admin_delete_user(email: str, request: Request):
     return {"ok": True}
 
 
+@app.get("/api/admin/searches")
+async def admin_get_searches(request: Request):
+    """Admin views all users' search activity."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    cycles = list(db.cycles.find(
+        {},
+        {"analyzed_profiles": 0}
+    ).sort("completed_at", -1).limit(200))
+    for c in cycles:
+        c["_id"] = str(c["_id"])
+        if "completed_at" in c:
+            c["completed_at"] = c["completed_at"].isoformat()
+    return cycles
+
+
+@app.get("/api/admin/costs")
+async def admin_get_costs(request: Request):
+    """Admin views cost summary per user and overall totals."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    cycles = list(db.cycles.find({}, {"_id": 0, "user_email": 1, "cost": 1, "completed_at": 1, "analyzed_count": 1}))
+    user_costs = {}
+    total_cost  = 0.0
+    for c in cycles:
+        email = c.get("user_email", "unknown")
+        cost  = c.get("cost") or calculate_cycle_cost(c.get("analyzed_count", 0))
+        ct    = cost.get("total", 0)
+        total_cost += ct
+        if email not in user_costs:
+            user_costs[email] = {"email": email, "cycles": 0, "total_cost": 0.0,
+                                  "apify_phase1": 0.0, "apify_phase2": 0.0, "openai": 0.0}
+        user_costs[email]["cycles"]      += 1
+        user_costs[email]["total_cost"]  += ct
+        user_costs[email]["apify_phase1"] += cost.get("apify_phase1", 0)
+        user_costs[email]["apify_phase2"] += cost.get("apify_phase2", 0)
+        user_costs[email]["openai"]       += cost.get("openai", 0)
+    for u in user_costs.values():
+        u["total_cost"]  = round(u["total_cost"], 4)
+        u["apify_phase1"] = round(u["apify_phase1"], 4)
+        u["apify_phase2"] = round(u["apify_phase2"], 4)
+        u["openai"]       = round(u["openai"], 4)
+    return {
+        "total_cost": round(total_cost, 4),
+        "users": sorted(user_costs.values(), key=lambda x: x["total_cost"], reverse=True),
+    }
+
+
+@app.get("/api/admin/cycles/{cycle_id}/emails")
+async def admin_get_cycle_emails(cycle_id: str, request: Request):
+    """Admin views all emails found in a specific search cycle."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    from bson import ObjectId
+    try:
+        oid = ObjectId(cycle_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid cycle ID")
+    cycle = db.cycles.find_one(
+        {"_id": oid},
+        {"analyzed_profiles": 1, "search_query": 1, "user_email": 1}
+    )
+    if not cycle:
+        raise HTTPException(status_code=404, detail="Cycle not found")
+    profiles = cycle.get("analyzed_profiles", [])
+    emails = [
+        {
+            "name": p.get("name", ""),
+            "email": p.get("email", ""),
+            "headline": p.get("headline", ""),
+            "company": p.get("company", ""),
+            "linkedin_url": p.get("linkedin_url", ""),
+        }
+        for p in profiles if p.get("email")
+    ]
+    return {
+        "search_query": cycle.get("search_query", ""),
+        "user_email": cycle.get("user_email", ""),
+        "emails": emails
+    }
+
+
 # ─── Auth Endpoints ────────────────────────────────────────────
 
 @app.post("/api/auth/signin")
@@ -165,6 +250,24 @@ async def signin(request: Request):
 
 # ─── MongoDB Cycle Save ────────────────────────────────────────
 
+# ─── Cost Constants ───────────────────────────────────────────
+COST_APIFY_PHASE1   = 0.80   # per cycle (up to 50 profiles)
+COST_APIFY_PHASE2   = 0.10   # per selected profile (post scraping)
+COST_OPENAI_CYCLE   = 0.50   # per cycle (AI analysis)
+
+def calculate_cycle_cost(analyzed_count: int) -> dict:
+    apify_phase1 = COST_APIFY_PHASE1
+    apify_phase2 = round(COST_APIFY_PHASE2 * analyzed_count, 4)
+    openai       = COST_OPENAI_CYCLE
+    total        = round(apify_phase1 + apify_phase2 + openai, 4)
+    return {
+        "apify_phase1": apify_phase1,
+        "apify_phase2": apify_phase2,
+        "openai":       openai,
+        "total":        total,
+    }
+
+
 def save_cycle_to_db(job: dict):
     """Save a completed search cycle to MongoDB (posts stripped to reduce doc size)."""
     if db is None:
@@ -174,16 +277,19 @@ def save_cycle_to_db(job: dict):
         return
     try:
         profiles_for_db = list(job.get("analyzed_profiles", []))
+        cost = calculate_cycle_cost(len(profiles_for_db))
         db.cycles.insert_one({
             "user_email": user_email,
             "search_query": job.get("search_query", ""),
+            "search_params": job.get("search_params", {}),
             "completed_at": datetime.utcnow(),
             "profiles_with_email_count": len(job.get("profiles_with_email", [])),
             "profiles_without_email_count": len(job.get("profiles_without_email", [])),
             "analyzed_count": len(profiles_for_db),
             "analyzed_profiles": profiles_for_db,
+            "cost": cost,
         })
-        print(f"[DB] Saved cycle for {user_email} — {len(profiles_for_db)} profiles")
+        print(f"[DB] Saved cycle for {user_email} — {len(profiles_for_db)} profiles — cost ${cost['total']}")
     except Exception as e:
         print(f"[DB] Failed to save cycle: {e}")
 

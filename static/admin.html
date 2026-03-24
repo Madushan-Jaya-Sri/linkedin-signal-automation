@@ -192,6 +192,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .cost-card-sub { font-size: 0.68rem; color: #94a3b8; }
 .pill-blue { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
 
+/* ── PENDING APPROVALS ───────────────────────── */
+.pending-item { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-bottom: 1px solid #f1f5f9; }
+.pending-item:last-child { border-bottom: none; }
+.pending-info { flex: 1; min-width: 0; }
+.pending-name { font-size: 0.88rem; font-weight: 700; color: #0f172a; }
+.pending-email { font-size: 0.78rem; color: #6366f1; }
+.pending-date { font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }
+.pending-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.btn-approve { background: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; border-radius: 7px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+.btn-approve:hover { background: #16a34a; color: #fff; }
+.btn-reject { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 7px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+.btn-reject:hover { background: #dc2626; color: #fff; }
+.pending-empty { padding: 48px; text-align: center; color: #94a3b8; font-size: 0.85rem; }
+.pending-empty svg { display: block; margin: 0 auto 12px; }
+
 /* ── SEARCH ACTIVITY TWO-PANEL ──────────────── */
 .sa-layout { display: flex; gap: 0; background: #fff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; min-height: 520px; }
 .sa-users { width: 260px; flex-shrink: 0; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; }
@@ -313,6 +328,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <div class="sb-item" onclick="navigate('costs')" id="nav-costs">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           Cost Tracker
+        </div>
+        <div class="sb-item" onclick="navigate('pending')" id="nav-pending">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Approvals
+          <span class="sb-badge" id="sb-pending-count" style="background:#ef4444;display:none">0</span>
         </div>
       </div>
 
@@ -554,6 +574,28 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           </div>
         </div>
 
+        <!-- ── PENDING APPROVALS PAGE ── -->
+        <div class="page" id="page-pending">
+          <div class="card">
+            <div class="card-head">
+              <div class="card-head-title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                Pending Approvals
+                <span class="count-badge" id="pendingCount">0</span>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="loadPending()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Refresh
+              </button>
+            </div>
+            <div class="card-body">
+              <div id="pendingBody">
+                <div style="padding:32px;text-align:center;color:#94a3b8;font-size:0.85rem">Loading...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div><!-- /content -->
     </div><!-- /main -->
   </div><!-- /shell -->
@@ -690,6 +732,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     allUsers    = usersRes.ok    ? await usersRes.json()    : [];
     allSearches = searchesRes.ok ? await searchesRes.json() : [];
     allUsage    = usageRes.ok    ? await usageRes.json()    : [];
+    loadPending();
 
     document.getElementById('sb-user-count').textContent = allUsers.length;
     document.getElementById('sb-search-count').textContent = allSearches.length;
@@ -1075,6 +1118,65 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = 'emails.csv'; a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // ── PENDING APPROVALS ──────────────────────────────
+  async function loadPending() {
+    const res = await fetch('/api/admin/pending', { headers: { 'X-Admin-Secret': adminSecret } });
+    const list = res.ok ? await res.json() : [];
+    const count = list.length;
+    document.getElementById('pendingCount').textContent = count;
+    const badge = document.getElementById('sb-pending-count');
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'inline-flex' : 'none';
+
+    const body = document.getElementById('pendingBody');
+    if (!list.length) {
+      body.innerHTML = `<div class="pending-empty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        No pending requests. All caught up!
+      </div>`;
+      return;
+    }
+    body.innerHTML = list.map(u => {
+      const color = avatarColor(u.email);
+      const date  = u.created_at ? new Date(u.created_at).toLocaleString() : '—';
+      return `<div class="pending-item" id="pending-${esc(u.email)}">
+        <div class="user-avatar" style="background:${color};width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:800;color:#fff;flex-shrink:0">${initials(u.name)}</div>
+        <div class="pending-info">
+          <div class="pending-name">${esc(u.name)}</div>
+          <div class="pending-email">${esc(u.email)}</div>
+          <div class="pending-date">Requested: ${date}</div>
+        </div>
+        <div class="pending-actions">
+          <button class="btn-approve" onclick="approveUser('${esc(u.email)}', this)">&#10003; Approve</button>
+          <button class="btn-reject"  onclick="rejectUser('${esc(u.email)}', this)">&#10005; Reject</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  async function approveUser(email, btn) {
+    btn.disabled = true; btn.textContent = 'Approving...';
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(email)}/approve`, {
+      method: 'POST', headers: { 'X-Admin-Secret': adminSecret }
+    });
+    if (res.ok) {
+      document.getElementById(`pending-${email}`)?.remove();
+      loadPending(); loadAll();
+    } else { btn.disabled = false; btn.textContent = '✓ Approve'; }
+  }
+
+  async function rejectUser(email, btn) {
+    if (!confirm(`Reject ${email}?`)) return;
+    btn.disabled = true; btn.textContent = 'Rejecting...';
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(email)}/reject`, {
+      method: 'POST', headers: { 'X-Admin-Secret': adminSecret }
+    });
+    if (res.ok) {
+      document.getElementById(`pending-${email}`)?.remove();
+      loadPending();
+    } else { btn.disabled = false; btn.textContent = '✗ Reject'; }
   }
 
   // ── INIT ──────────────────────────────────────────

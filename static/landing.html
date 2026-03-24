@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkedIn Lead Intelligence — Find, Filter & Analyze Prospects</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --brand: #6366f1;
+  --brand-dark: #4f46e5;
+  --brand-light: #eef2ff;
+  --dark: #0f172a;
+  --mid: #475569;
+  --soft: #94a3b8;
+  --border: #e2e8f0;
+  --bg: #f8fafc;
+  --white: #ffffff;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: var(--dark); background: var(--white); }
+
+/* ── NAV ─────────────────────── */
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.nav-inner { max-width: 1100px; margin: 0 auto; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; }
+.nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.nav-icon { width: 34px; height: 34px; border-radius: 9px; background: #0077b5; display: flex; align-items: center; justify-content: center; }
+.nav-icon svg { display: block; }
+.nav-name { font-size: 1rem; font-weight: 800; color: var(--dark); }
+.nav-tag { font-size: 0.6rem; color: var(--soft); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+.nav-actions { display: flex; align-items: center; gap: 10px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 9px 20px; font-size: 0.88rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; text-decoration: none; }
+.btn-ghost { background: none; border: 1px solid var(--border); color: var(--mid); }
+.btn-ghost:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
+.btn-primary { background: var(--brand); color: #fff; }
+.btn-primary:hover { background: var(--brand-dark); }
+.btn-lg { padding: 13px 32px; font-size: 0.95rem; border-radius: 10px; }
+.btn-white { background: #fff; color: var(--brand); }
+.btn-white:hover { background: #eef2ff; }
+
+/* ── HERO ────────────────────── */
+.hero { padding: 120px 24px 80px; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%); position: relative; overflow: hidden; text-align: center; }
+.hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(99,102,241,0.25) 0%, transparent 70%); pointer-events: none; }
+.hero-inner { max-width: 760px; margin: 0 auto; position: relative; }
+.hero-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); border-radius: 20px; padding: 5px 14px; font-size: 0.75rem; font-weight: 600; color: #a5b4fc; margin-bottom: 24px; letter-spacing: 0.5px; text-transform: uppercase; }
+.hero-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: #6366f1; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+.hero-title { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 900; color: #fff; line-height: 1.15; letter-spacing: -0.03em; margin-bottom: 20px; }
+.hero-title span { background: linear-gradient(135deg, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.hero-sub { font-size: 1.05rem; color: #94a3b8; line-height: 1.7; margin-bottom: 36px; max-width: 560px; margin-left: auto; margin-right: auto; }
+.hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.hero-stats { display: flex; justify-content: center; gap: 40px; margin-top: 56px; padding-top: 40px; border-top: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; }
+.hero-stat-val { font-size: 1.6rem; font-weight: 800; color: #fff; }
+.hero-stat-label { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+
+/* ── FEATURES ─────────────────── */
+.features { padding: 80px 24px; background: var(--bg); }
+.section-inner { max-width: 1100px; margin: 0 auto; }
+.section-eyebrow { font-size: 0.72rem; font-weight: 700; color: var(--brand); text-transform: uppercase; letter-spacing: 1.5px; text-align: center; margin-bottom: 12px; }
+.section-title { font-size: clamp(1.5rem, 3vw, 2.2rem); font-weight: 800; text-align: center; color: var(--dark); margin-bottom: 12px; letter-spacing: -0.02em; }
+.section-sub { text-align: center; color: var(--soft); font-size: 0.95rem; margin-bottom: 52px; max-width: 500px; margin-left: auto; margin-right: auto; }
+.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.feat-card { background: var(--white); border: 1px solid var(--border); border-radius: 16px; padding: 28px; transition: all 0.2s; }
+.feat-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,0.08); border-color: #c7d2fe; }
+.feat-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+.feat-icon.purple { background: #ede9fe; color: #7c3aed; }
+.feat-icon.blue { background: #dbeafe; color: #2563eb; }
+.feat-icon.green { background: #dcfce7; color: #16a34a; }
+.feat-icon.orange { background: #ffedd5; color: #ea580c; }
+.feat-icon.pink { background: #fce7f3; color: #db2777; }
+.feat-icon.teal { background: #ccfbf1; color: #0d9488; }
+.feat-title { font-size: 0.95rem; font-weight: 700; color: var(--dark); margin-bottom: 8px; }
+.feat-desc { font-size: 0.83rem; color: var(--soft); line-height: 1.6; }
+
+/* ── HOW IT WORKS ─────────────── */
+.how { padding: 80px 24px; background: var(--white); }
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0; margin-top: 48px; position: relative; }
+.steps::before { content: ''; position: absolute; top: 28px; left: 10%; right: 10%; height: 2px; background: linear-gradient(90deg, var(--brand-light), var(--brand), var(--brand-light)); }
+.step { text-align: center; padding: 0 16px; position: relative; }
+.step-num { width: 56px; height: 56px; border-radius: 50%; background: var(--white); border: 2px solid var(--brand); display: flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: 800; color: var(--brand); margin: 0 auto 16px; position: relative; z-index: 1; }
+.step-title { font-size: 0.88rem; font-weight: 700; color: var(--dark); margin-bottom: 6px; }
+.step-desc { font-size: 0.78rem; color: var(--soft); line-height: 1.5; }
+
+/* ── CTA BANNER ───────────────── */
+.cta-banner { padding: 72px 24px; background: linear-gradient(135deg, #4f46e5, #7c3aed); text-align: center; }
+.cta-title { font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 800; color: #fff; margin-bottom: 12px; }
+.cta-sub { color: rgba(255,255,255,0.7); font-size: 0.95rem; margin-bottom: 32px; }
+
+/* ── FOOTER ──────────────────── */
+footer { padding: 28px 24px; background: var(--dark); text-align: center; }
+footer p { color: #475569; font-size: 0.78rem; }
+footer span { color: #6366f1; font-weight: 600; }
+
+/* ── AUTH MODAL ──────────────── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(6px); z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--white); border-radius: 20px; width: 100%; max-width: 440px; box-shadow: 0 32px 80px rgba(0,0,0,0.2); overflow: hidden; }
+.modal-header { background: linear-gradient(135deg, #0f172a, #1e1b4b); padding: 28px 32px 24px; }
+.modal-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.modal-icon { width: 36px; height: 36px; border-radius: 9px; background: #0077b5; display: flex; align-items: center; justify-content: center; }
+.modal-brand-name { font-size: 0.95rem; font-weight: 800; color: #fff; }
+.modal-brand-tag { font-size: 0.6rem; color: rgba(255,255,255,0.4); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+.modal-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.08); border-radius: 8px; padding: 3px; }
+.modal-tab { flex: 1; padding: 7px; text-align: center; font-size: 0.8rem; font-weight: 600; color: rgba(255,255,255,0.5); border-radius: 6px; cursor: pointer; transition: all 0.15s; border: none; background: none; }
+.modal-tab.active { background: rgba(255,255,255,0.15); color: #fff; }
+.modal-body { padding: 28px 32px 32px; }
+.form-panel { display: none; }
+.form-panel.active { display: block; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+.field input { width: 100%; background: var(--bg); border: 1.5px solid var(--border); border-radius: 9px; padding: 11px 14px; font-size: 0.88rem; outline: none; transition: all 0.15s; color: var(--dark); }
+.field input:focus { border-color: var(--brand); background: var(--white); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+.field input.error { border-color: #ef4444; }
+.field-err { font-size: 0.72rem; color: #ef4444; margin-top: 4px; display: none; }
+.field-err.show { display: block; }
+.form-err { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 14px; font-size: 0.8rem; color: #dc2626; margin-bottom: 16px; display: none; }
+.form-err.show { display: block; }
+.form-success { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; font-size: 0.85rem; color: #166534; text-align: center; display: none; line-height: 1.6; }
+.form-success.show { display: block; }
+.submit-btn { width: 100%; background: var(--brand); color: #fff; border: none; border-radius: 9px; padding: 12px; font-size: 0.9rem; font-weight: 700; cursor: pointer; transition: background 0.15s; margin-top: 4px; }
+.submit-btn:hover { background: var(--brand-dark); }
+.submit-btn:disabled { background: #c7d2fe; cursor: not-allowed; }
+.modal-close { position: absolute; top: 16px; right: 16px; background: rgba(255,255,255,0.1); border: none; color: rgba(255,255,255,0.6); width: 30px; height: 30px; border-radius: 6px; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; z-index: 10; }
+.modal-close:hover { background: rgba(255,255,255,0.2); color: #fff; }
+.modal-header { position: relative; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <a class="nav-brand" href="/">
+      <div class="nav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zm2-3a2 2 0 100-4 2 2 0 000 4z"/></svg>
+      </div>
+      <div>
+        <div class="nav-name">Lead Intel</div>
+        <div class="nav-tag">by Momentro Labs</div>
+      </div>
+    </a>
+    <div class="nav-actions">
+      <button class="btn btn-ghost" onclick="openModal('signin')">Sign In</button>
+      <button class="btn btn-primary" onclick="openModal('signup')">Request Access</button>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">
+      <div class="hero-badge-dot"></div>
+      AI-Powered LinkedIn Prospecting
+    </div>
+    <h1 class="hero-title">Find the Right Leads.<br><span>Analyze What Matters.</span></h1>
+    <p class="hero-sub">Scrape, filter, and AI-analyze LinkedIn profiles at scale. Get emails, post insights, and personalized outreach drafts — all in one tool.</p>
+    <div class="hero-actions">
+      <button class="btn btn-primary btn-lg" onclick="openModal('signup')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+        Request Access
+      </button>
+      <button class="btn btn-white btn-lg" onclick="openModal('signin')">
+        Sign In
+      </button>
+    </div>
+    <div class="hero-stats">
+      <div>
+        <div class="hero-stat-val">50+</div>
+        <div class="hero-stat-label">Profiles per search</div>
+      </div>
+      <div>
+        <div class="hero-stat-val">AI</div>
+        <div class="hero-stat-label">Relevance scoring</div>
+      </div>
+      <div>
+        <div class="hero-stat-val">20</div>
+        <div class="hero-stat-label">Posts analyzed per profile</div>
+      </div>
+      <div>
+        <div class="hero-stat-val">CSV</div>
+        <div class="hero-stat-label">Export ready</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="section-inner">
+    <div class="section-eyebrow">What you get</div>
+    <h2 class="section-title">Everything you need to find the right prospects</h2>
+    <p class="section-sub">From raw LinkedIn search to personalized outreach — fully automated.</p>
+    <div class="features-grid">
+      <div class="feat-card">
+        <div class="feat-icon purple">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <div class="feat-title">Advanced Profile Scraping</div>
+        <div class="feat-desc">Search LinkedIn by job title, company, location, seniority, industry, and more. Get up to 50 profiles per search.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon blue">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        </div>
+        <div class="feat-title">Smart Filtering</div>
+        <div class="feat-desc">Filter by email availability, connections, location, hiring status and more to narrow down your ideal prospects.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon green">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </div>
+        <div class="feat-title">AI Relevance Scoring</div>
+        <div class="feat-desc">GPT-4 analyzes each profile's posts and background, scoring relevance 0–100 and explaining the reasoning.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon orange">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </div>
+        <div class="feat-title">Email Extraction</div>
+        <div class="feat-desc">Automatically extract and export email addresses from LinkedIn profiles. Export to CSV in one click.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon pink">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div class="feat-title">AI Outreach Drafts</div>
+        <div class="feat-desc">Generate personalized outreach emails for each prospect based on their profile, posts, and background.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon teal">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="feat-title">Search History</div>
+        <div class="feat-desc">All your past searches and analyses are saved. Revisit, re-analyze, and export any previous run at any time.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how">
+  <div class="section-inner">
+    <div class="section-eyebrow">How it works</div>
+    <h2 class="section-title">From search to outreach in minutes</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-title">Search</div>
+        <div class="step-desc">Enter your LinkedIn search query with filters. Scrape up to 50 matching profiles.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-title">Filter</div>
+        <div class="step-desc">Review results split by email availability. Select profiles for deep analysis.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-title">Analyze</div>
+        <div class="step-desc">AI scrapes their recent posts and scores each profile's relevance to your goal.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-title">Outreach</div>
+        <div class="step-desc">Copy emails, generate AI outreach drafts, or export the full list to CSV.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-banner">
+  <h2 class="cta-title">Ready to find your next best prospect?</h2>
+  <p class="cta-sub">Request access today. Admin approval required — we keep it exclusive.</p>
+  <button class="btn btn-white btn-lg" onclick="openModal('signup')">Request Access</button>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>Built by <span>Momentro Labs</span> &nbsp;·&nbsp; LinkedIn Lead Intelligence &nbsp;·&nbsp; &copy; 2026</p>
+</footer>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+      <div class="modal-brand">
+        <div class="modal-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zm2-3a2 2 0 100-4 2 2 0 000 4z"/></svg>
+        </div>
+        <div>
+          <div class="modal-brand-name">Lead Intel</div>
+          <div class="modal-brand-tag">by Momentro Labs</div>
+        </div>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab active" id="tab-signin" onclick="switchTab('signin')">Sign In</button>
+        <button class="modal-tab" id="tab-signup" onclick="switchTab('signup')">Request Access</button>
+      </div>
+    </div>
+    <div class="modal-body">
+
+      <!-- SIGN IN FORM -->
+      <div class="form-panel active" id="panel-signin">
+        <div class="form-err" id="si-err"></div>
+        <div class="field">
+          <label>Email Address</label>
+          <input type="email" id="si-email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')doSignin()">
+          <div class="field-err" id="si-email-err"></div>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="si-password" placeholder="Your password" onkeydown="if(event.key==='Enter')doSignin()">
+          <div class="field-err" id="si-pass-err"></div>
+        </div>
+        <button class="submit-btn" id="si-btn" onclick="doSignin()">Sign In</button>
+      </div>
+
+      <!-- SIGN UP FORM -->
+      <div class="form-panel" id="panel-signup">
+        <div class="form-err" id="su-err"></div>
+        <div class="form-success" id="su-success">
+          ✅ <strong>Request submitted!</strong><br>
+          Your account is pending admin approval.<br>You'll be able to sign in once approved.
+        </div>
+        <div id="su-form">
+          <div class="field">
+            <label>Full Name</label>
+            <input type="text" id="su-name" placeholder="Your full name">
+            <div class="field-err" id="su-name-err"></div>
+          </div>
+          <div class="field">
+            <label>Email Address</label>
+            <input type="email" id="su-email" placeholder="you@example.com">
+            <div class="field-err" id="su-email-err"></div>
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input type="password" id="su-password" placeholder="Min 8 characters" onkeydown="if(event.key==='Enter')doSignup()">
+            <div class="field-err" id="su-pass-err"></div>
+          </div>
+          <button class="submit-btn" id="su-btn" onclick="doSignup()">Request Access</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  function openModal(tab) {
+    document.getElementById('modalOverlay').classList.add('open');
+    switchTab(tab);
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  function handleOverlayClick(e) {
+    if (e.target === document.getElementById('modalOverlay')) closeModal();
+  }
+  function switchTab(tab) {
+    ['signin','signup'].forEach(t => {
+      document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+      document.getElementById(`panel-${t}`).classList.toggle('active', t === tab);
+    });
+  }
+
+  function clearErrors() {
+    ['si-err','si-email-err','si-pass-err','su-err','su-name-err','su-email-err','su-pass-err'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = ''; el.classList.remove('show'); }
+    });
+    ['si-email','si-password','su-name','su-email','su-password'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('error');
+    });
+  }
+
+  function showErr(id, msg) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = msg; el.classList.add('show'); }
+  }
+
+  async function doSignin() {
+    clearErrors();
+    const email = document.getElementById('si-email').value.trim();
+    const pass  = document.getElementById('si-password').value;
+    let ok = true;
+    if (!email) { showErr('si-email-err', 'Email is required'); document.getElementById('si-email').classList.add('error'); ok = false; }
+    if (!pass)  { showErr('si-pass-err', 'Password is required'); document.getElementById('si-password').classList.add('error'); ok = false; }
+    if (!ok) return;
+
+    const btn = document.getElementById('si-btn');
+    btn.disabled = true; btn.textContent = 'Signing in...';
+    try {
+      const res = await fetch('/api/auth/signin', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({email, password: pass})
+      });
+      const data = await res.json();
+      if (!res.ok) { showErr('si-err', data.detail || 'Sign in failed'); btn.disabled = false; btn.textContent = 'Sign In'; return; }
+      localStorage.setItem('leadIntelToken', data.token);
+      localStorage.setItem('leadIntelUser', JSON.stringify({name: data.name, email: data.email}));
+      window.location.href = '/app';
+    } catch(e) {
+      showErr('si-err', 'Network error. Please try again.');
+      btn.disabled = false; btn.textContent = 'Sign In';
+    }
+  }
+
+  async function doSignup() {
+    clearErrors();
+    const name  = document.getElementById('su-name').value.trim();
+    const email = document.getElementById('su-email').value.trim();
+    const pass  = document.getElementById('su-password').value;
+    let ok = true;
+    if (!name)          { showErr('su-name-err', 'Full name is required'); document.getElementById('su-name').classList.add('error'); ok = false; }
+    if (!email)         { showErr('su-email-err', 'Email is required'); document.getElementById('su-email').classList.add('error'); ok = false; }
+    if (pass.length < 8){ showErr('su-pass-err', 'Min 8 characters'); document.getElementById('su-password').classList.add('error'); ok = false; }
+    if (!ok) return;
+
+    const btn = document.getElementById('su-btn');
+    btn.disabled = true; btn.textContent = 'Submitting...';
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({name, email, password: pass})
+      });
+      const data = await res.json();
+      if (!res.ok) { showErr('su-err', data.detail || 'Request failed'); btn.disabled = false; btn.textContent = 'Request Access'; return; }
+      document.getElementById('su-form').style.display = 'none';
+      document.getElementById('su-success').classList.add('show');
+    } catch(e) {
+      showErr('su-err', 'Network error. Please try again.');
+      btn.disabled = false; btn.textContent = 'Request Access';
+    }
+  }
+
+  // If already logged in, redirect to app
+  if (localStorage.getItem('leadIntelToken')) {
+    window.location.href = '/app';
+  }
+</script>
+</body>
+</html>

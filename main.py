@@ -128,7 +128,7 @@ async def admin_list_users(request: Request):
     require_admin(request)
     if db is None:
         raise HTTPException(status_code=503, detail="Database not configured")
-    users = list(db.users.find({}, {"_id": 0, "name": 1, "email": 1, "created_at": 1}))
+    users = list(db.users.find({"status": {"$ne": "pending"}}, {"_id": 0, "name": 1, "email": 1, "created_at": 1, "status": 1}))
     for u in users:
         if isinstance(u.get("created_at"), datetime):
             u["created_at"] = u["created_at"].isoformat()
@@ -143,6 +143,43 @@ async def admin_delete_user(email: str, request: Request):
         raise HTTPException(status_code=503, detail="Database not configured")
     result = db.users.delete_one({"email": email.lower()})
     if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"ok": True}
+
+
+@app.get("/api/admin/pending")
+async def admin_pending_users(request: Request):
+    """List users with pending status."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    users = list(db.users.find({"status": "pending"}, {"_id": 0, "name": 1, "email": 1, "created_at": 1}))
+    for u in users:
+        if isinstance(u.get("created_at"), datetime):
+            u["created_at"] = u["created_at"].isoformat()
+    return users
+
+
+@app.post("/api/admin/users/{email}/approve")
+async def admin_approve_user(email: str, request: Request):
+    """Approve a pending user."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    result = db.users.update_one({"email": email.lower()}, {"$set": {"status": "approved"}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"ok": True}
+
+
+@app.post("/api/admin/users/{email}/reject")
+async def admin_reject_user(email: str, request: Request):
+    """Reject a pending user."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    result = db.users.update_one({"email": email.lower()}, {"$set": {"status": "rejected"}})
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
     return {"ok": True}
 
@@ -255,6 +292,32 @@ async def admin_get_cycle_emails(cycle_id: str, request: Request):
 
 # ─── Auth Endpoints ────────────────────────────────────────────
 
+@app.post("/api/auth/signup")
+async def signup(request: Request):
+    """Public signup — creates account with pending status for admin approval."""
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    body = await request.json()
+    name     = body.get("name", "").strip()
+    email    = body.get("email", "").strip().lower()
+    password = body.get("password", "")
+    if not name or not email or not password:
+        raise HTTPException(status_code=400, detail="Name, email and password are required")
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    try:
+        db.users.insert_one({
+            "name":       name,
+            "email":      email,
+            "password":   hash_password(password),
+            "status":     "pending",
+            "created_at": datetime.utcnow(),
+        })
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="Email already registered")
+    return {"ok": True, "message": "Request submitted. You'll be notified when your account is approved."}
+
+
 @app.post("/api/auth/signin")
 async def signin(request: Request):
     if db is None:
@@ -265,6 +328,11 @@ async def signin(request: Request):
     user = db.users.find_one({"email": email})
     if not user or not verify_password(password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    status = user.get("status", "approved")
+    if status == "pending":
+        raise HTTPException(status_code=403, detail="Your account is pending approval. Please wait for admin to approve.")
+    if status == "rejected":
+        raise HTTPException(status_code=403, detail="Your account request was rejected. Please contact support.")
     token = create_token(email)
     return {"token": token, "name": user["name"], "email": email}
 
@@ -445,7 +513,12 @@ def _run_phase2(job_id: str, selected_urls: list[str]):
 # ─── Endpoints ────────────────────────────────────────────────
 
 @app.get("/")
-async def serve_index():
+async def serve_landing():
+    return FileResponse("static/landing.html")
+
+
+@app.get("/app")
+async def serve_app():
     return FileResponse("static/index.html")
 
 

@@ -438,6 +438,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
                 <thead>
                   <tr>
                     <th>User</th>
+                    <th>Status</th>
                     <th>Searches</th>
                     <th>Deep Search Usage</th>
                     <th>Last Active</th>
@@ -843,6 +844,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       const usage = allUsage.find(x => x.email === u.email) || { used: 0, limit: 50, remaining: 50 };
       const usagePct = Math.min(100, Math.round((usage.used / usage.limit) * 100));
       const usageColor = usage.remaining === 0 ? '#ef4444' : usage.remaining <= 10 ? '#f59e0b' : '#10b981';
+      const isPaused = u.status === 'paused';
+      const statusBadge = isPaused
+        ? `<span class="pill" style="background:#fee2e2;color:#dc2626;font-size:0.7rem">Paused</span>`
+        : `<span class="pill" style="background:#dcfce7;color:#16a34a;font-size:0.7rem">Active</span>`;
+      const pauseBtn = isPaused
+        ? `<button class="btn btn-sm" style="background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0" onclick="event.stopPropagation(); togglePauseUser('${esc(u.email)}', false, this)">Activate</button>`
+        : `<button class="btn btn-sm" style="background:#fef9c3;color:#854d0e;border:1px solid #fde68a" onclick="event.stopPropagation(); togglePauseUser('${esc(u.email)}', true, this)">Pause</button>`;
       return `<tr onclick="openUserDetail('${esc(u.email)}')">
         <td>
           <div class="user-cell">
@@ -853,6 +861,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
             </div>
           </div>
         </td>
+        <td>${statusBadge}</td>
         <td><span class="pill pill-blue">${userSearches.length} searches</span></td>
         <td>
           <div style="display:flex;align-items:center;gap:8px;min-width:120px">
@@ -864,8 +873,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         </td>
         <td><span style="font-size:0.8rem;color:#64748b">${lastActive}</span></td>
         <td><span style="font-size:0.8rem;color:#64748b">${joined}</span></td>
-        <td>
-          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteUser('${esc(u.email)}', this)">Revoke</button>
+        <td style="white-space:nowrap">
+          ${pauseBtn}
+          <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="event.stopPropagation(); deleteUser('${esc(u.email)}', this)">Revoke</button>
         </td>
       </tr>`;
     }).join('');
@@ -1108,6 +1118,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       method: 'DELETE', headers: { 'X-Admin-Secret': adminSecret }
     });
     if (res.ok) { loadAll(); } else { btn.disabled = false; btn.textContent = 'Revoke'; alert('Failed.'); }
+  }
+
+  async function togglePauseUser(email, pause, btn) {
+    const action = pause ? 'pause' : 'activate';
+    btn.disabled = true; btn.textContent = '...';
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(email)}/${action}`, {
+      method: 'POST', headers: { 'X-Admin-Secret': adminSecret }
+    });
+    if (res.ok) { loadAll(); } else { btn.disabled = false; btn.textContent = pause ? 'Pause' : 'Activate'; alert('Failed.'); }
   }
 
   // ── EMAIL DRAWER ──────────────────────────────────

@@ -2052,7 +2052,7 @@
       const el = document.getElementById('usageBadge');
       if (!el) return;
       if (data.remaining === 0) {
-        el.innerHTML = `<span style="color:#ff6b6b;font-size:0.73rem;font-weight:600">⚠ You've reached your limit for this month.</span>`;
+        el.innerHTML = `<span style="color:#ff6b6b;font-size:0.92rem;font-weight:800;letter-spacing:0.01em">⚠ You've reached your limit for this month.</span>`;
       } else {
         const planLabel = { starter: 'Starter', growth: 'Growth', pro: 'Pro' }[data.plan] || 'Growth';
         const planColor = { starter: '#2563eb', growth: '#16a34a', pro: '#7c3aed' }[data.plan] || '#16a34a';

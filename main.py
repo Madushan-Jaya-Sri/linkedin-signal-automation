@@ -184,6 +184,30 @@ async def admin_reject_user(email: str, request: Request):
     return {"ok": True}
 
 
+@app.post("/api/admin/users/{email}/pause")
+async def admin_pause_user(email: str, request: Request):
+    """Pause an active user account."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    result = db.users.update_one({"email": email.lower()}, {"$set": {"status": "paused"}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"ok": True}
+
+
+@app.post("/api/admin/users/{email}/activate")
+async def admin_activate_user(email: str, request: Request):
+    """Re-activate a paused user account."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    result = db.users.update_one({"email": email.lower()}, {"$set": {"status": "approved"}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"ok": True}
+
+
 @app.get("/api/admin/searches")
 async def admin_get_searches(request: Request):
     """Admin views all users' search activity."""
@@ -374,6 +398,8 @@ async def signin(request: Request):
         raise HTTPException(status_code=403, detail="Your account is pending approval. Please wait for admin to approve.")
     if status == "rejected":
         raise HTTPException(status_code=403, detail="Your account request was rejected. Please contact support.")
+    if status in ("paused", "inactive"):
+        raise HTTPException(status_code=403, detail="Your account has been deactivated. Please contact support.")
     token = create_token(email)
     return {"token": token, "name": user["name"], "email": email}
 

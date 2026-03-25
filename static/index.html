@@ -2051,20 +2051,23 @@
       const data = await res.json();
       const el = document.getElementById('usageBadge');
       if (!el) return;
-      const planLabel = { starter: 'Starter', growth: 'Growth', pro: 'Pro' }[data.plan] || 'Growth';
-      const planColor = { starter: '#2563eb', growth: '#16a34a', pro: '#7c3aed' }[data.plan] || '#16a34a';
-      const pct = data.limit > 0 ? Math.min(100, Math.round((data.used / data.limit) * 100)) : 0;
-      const barColor = pct >= 85 ? '#e74c3c' : pct >= 60 ? '#f39c12' : '#27ae60';
-      const textColor = data.remaining === 0 ? '#e74c3c' : data.remaining <= 5 ? '#f39c12' : 'rgba(255,255,255,0.9)';
-      el.innerHTML = `
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span style="background:${planColor};color:#fff;border-radius:4px;padding:1px 7px;font-size:0.68rem;font-weight:700">${planLabel}</span>
-          <span style="color:${textColor};font-size:0.73rem;font-weight:500">${data.used} / ${data.limit} profiles this month</span>
-        </div>
-        <div style="margin-top:5px;width:200px;max-width:100%;background:rgba(255,255,255,0.2);border-radius:6px;height:5px;overflow:hidden">
-          <div style="width:${pct}%;height:100%;background:${barColor};border-radius:6px;transition:width 0.4s ease"></div>
-        </div>
-      `;
+      if (data.remaining === 0) {
+        el.innerHTML = `<span style="color:#ff6b6b;font-size:0.92rem;font-weight:800;letter-spacing:0.01em">⚠ You've reached your limit for this month.</span>`;
+      } else {
+        const planLabel = { starter: 'Starter', growth: 'Growth', pro: 'Pro' }[data.plan] || 'Growth';
+        const planColor = { starter: '#2563eb', growth: '#16a34a', pro: '#7c3aed' }[data.plan] || '#16a34a';
+        const pct = data.limit > 0 ? Math.min(100, Math.round((data.used / data.limit) * 100)) : 0;
+        const barColor = pct >= 85 ? '#e74c3c' : pct >= 60 ? '#f39c12' : '#27ae60';
+        el.innerHTML = `
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="background:${planColor};color:#fff;border-radius:4px;padding:1px 7px;font-size:0.68rem;font-weight:700">${planLabel}</span>
+            <span style="color:rgba(255,255,255,0.9);font-size:0.73rem;font-weight:500">${data.used} / ${data.limit} profiles this month</span>
+          </div>
+          <div style="margin-top:5px;width:200px;max-width:100%;background:rgba(255,255,255,0.2);border-radius:6px;height:5px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:${barColor};border-radius:6px;transition:width 0.4s ease"></div>
+          </div>
+        `;
+      }
     } catch(e) {}
   }
 

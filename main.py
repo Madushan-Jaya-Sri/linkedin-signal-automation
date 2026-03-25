@@ -398,8 +398,8 @@ async def signin(request: Request):
         raise HTTPException(status_code=403, detail="Your account is pending approval. Please wait for admin to approve.")
     if status == "rejected":
         raise HTTPException(status_code=403, detail="Your account request was rejected. Please contact support.")
-    if status == "paused":
-        raise HTTPException(status_code=403, detail="Your account has been paused. Please contact support.")
+    if status in ("paused", "inactive"):
+        raise HTTPException(status_code=403, detail="Your account has been deactivated. Please contact support.")
     token = create_token(email)
     return {"token": token, "name": user["name"], "email": email}
 

@@ -637,16 +637,57 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           </div>
 
           <div class="card" style="margin-top:20px">
-            <div class="card-head"><div class="card-head-title">Plan Limits Reference</div></div>
-            <div class="card-body">
-              <table class="data-table">
-                <thead><tr><th>Plan</th><th>Monthly Profiles</th></tr></thead>
-                <tbody>
-                  <tr><td><span class="pill" style="background:#dbeafe;color:#1d4ed8">Starter</span></td><td>25 analyzed profiles / month</td></tr>
-                  <tr><td><span class="pill" style="background:#dcfce7;color:#15803d">Growth</span></td><td>50 analyzed profiles / month</td></tr>
-                  <tr><td><span class="pill" style="background:#fae8ff;color:#7e22ce">Pro</span></td><td>100 analyzed profiles / month</td></tr>
-                </tbody>
-              </table>
+            <div class="card-head">
+              <div class="card-head-title">Plan Availability</div>
+              <button class="btn btn-primary btn-sm" id="savePlansBtn" onclick="savePlanToggles()">Save Plan Settings</button>
+            </div>
+            <div class="card-body" style="padding:20px 24px">
+              <p style="font-size:0.78rem;color:#64748b;margin-bottom:16px">Enable or disable plans. Disabled plans cannot be assigned to users and won't appear in the plan selector.</p>
+              <div style="display:flex;flex-direction:column;gap:14px" id="planToggleList">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px">
+                  <div>
+                    <span class="pill" style="background:#dbeafe;color:#1d4ed8;margin-right:10px">Starter</span>
+                    <span style="font-size:0.8rem;color:#64748b">25 profiles / month — $9/mo</span>
+                  </div>
+                  <label class="toggle-wrap">
+                    <div class="toggle-switch">
+                      <input type="checkbox" id="plan-toggle-starter">
+                      <div class="toggle-track"></div>
+                      <div class="toggle-thumb"></div>
+                    </div>
+                    <span class="toggle-label" id="plan-lbl-starter">—</span>
+                  </label>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px">
+                  <div>
+                    <span class="pill" style="background:#dcfce7;color:#15803d;margin-right:10px">Growth</span>
+                    <span style="font-size:0.8rem;color:#64748b">50 profiles / month — $39/mo</span>
+                  </div>
+                  <label class="toggle-wrap">
+                    <div class="toggle-switch">
+                      <input type="checkbox" id="plan-toggle-growth">
+                      <div class="toggle-track"></div>
+                      <div class="toggle-thumb"></div>
+                    </div>
+                    <span class="toggle-label" id="plan-lbl-growth">—</span>
+                  </label>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px">
+                  <div>
+                    <span class="pill" style="background:#fae8ff;color:#7e22ce;margin-right:10px">Pro</span>
+                    <span style="font-size:0.8rem;color:#64748b">100 profiles / month — $79/mo</span>
+                  </div>
+                  <label class="toggle-wrap">
+                    <div class="toggle-switch">
+                      <input type="checkbox" id="plan-toggle-pro">
+                      <div class="toggle-track"></div>
+                      <div class="toggle-thumb"></div>
+                    </div>
+                    <span class="toggle-label" id="plan-lbl-pro">—</span>
+                  </label>
+                </div>
+              </div>
+              <span id="plansSaved" style="font-size:0.8rem;color:#16a34a;display:none;margin-top:10px;display:none">✓ Plan settings saved!</span>
             </div>
           </div>
         </div>
@@ -1291,12 +1332,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   }
 
   // ── SETTINGS ──────────────────────────────────────
+  let enabledPlans = ['growth'];
+
   async function loadSettings() {
     const res = await fetch('/api/admin/settings', { headers: { 'X-Admin-Secret': adminSecret } });
     if (!res.ok) return;
     const s = await res.json();
     document.getElementById('set-max-items').value = s.max_items ?? 50;
     document.getElementById('set-max-posts').value  = s.max_posts  ?? 10;
+    enabledPlans = s.enabled_plans || ['growth'];
+    ['starter', 'growth', 'pro'].forEach(p => {
+      const cb = document.getElementById(`plan-toggle-${p}`);
+      const lbl = document.getElementById(`plan-lbl-${p}`);
+      const on = enabledPlans.includes(p);
+      if (cb) cb.checked = on;
+      if (lbl) { lbl.textContent = on ? 'Enabled' : 'Disabled'; lbl.className = `toggle-label ${on ? 'on' : 'off'}`; }
+    });
   }
 
   async function saveSettings() {
@@ -1314,6 +1365,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     if (res.ok) {
       const ok = document.getElementById('settingsSaved');
       ok.style.display = 'inline'; setTimeout(() => ok.style.display = 'none', 2500);
+    }
+  }
+
+  async function savePlanToggles() {
+    const btn = document.getElementById('savePlansBtn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    const plans = ['starter', 'growth', 'pro'].filter(p => document.getElementById(`plan-toggle-${p}`)?.checked);
+    const res = await fetch('/api/admin/settings', {
+      method: 'PUT', headers: { 'X-Admin-Secret': adminSecret, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled_plans: plans.length ? plans : ['growth'] })
+    });
+    btn.disabled = false; btn.textContent = 'Save Plan Settings';
+    if (res.ok) {
+      enabledPlans = plans.length ? plans : ['growth'];
+      const ok = document.getElementById('plansSaved');
+      ok.style.display = 'inline'; setTimeout(() => ok.style.display = 'none', 2500);
+      loadPlanTable();
     }
   }
 
@@ -1340,9 +1408,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         </td>
         <td>
           <select onchange="setPlan('${esc(u.email)}', this.value, this)" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:0.78rem;cursor:pointer">
-            <option value="starter" ${u.plan==='starter'?'selected':''}>Starter (25)</option>
-            <option value="growth"  ${u.plan==='growth' ?'selected':''}>Growth (50)</option>
-            <option value="pro"     ${u.plan==='pro'    ?'selected':''}>Pro (100)</option>
+            ${enabledPlans.includes('starter') ? `<option value="starter" ${u.plan==='starter'?'selected':''}>Starter (25)</option>` : ''}
+            ${enabledPlans.includes('growth')  ? `<option value="growth"  ${u.plan==='growth' ?'selected':''}>Growth (50)</option>`  : ''}
+            ${enabledPlans.includes('pro')     ? `<option value="pro"     ${u.plan==='pro'    ?'selected':''}>Pro (100)</option>`     : ''}
           </select>
         </td>
       </tr>`;

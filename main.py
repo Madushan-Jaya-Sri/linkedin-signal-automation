@@ -433,35 +433,9 @@ async def forgot_password(request: Request):
         raise HTTPException(status_code=503, detail="Database not configured")
     body  = await request.json()
     email = body.get("email", "").strip().lower()
-    # Always return ok — don't reveal whether email exists
-    user  = db.users.find_one({"email": email}, {"_id": 1})
-    if user:
-        token  = str(uuid.uuid4())
-        expiry = datetime.utcnow() + timedelta(hours=1)
-        db.password_resets.delete_many({"email": email})          # clear old requests
-        db.password_resets.insert_one({"email": email, "token": token, "expires_at": expiry})
-    return {"ok": True}
-
-
-@app.post("/api/auth/reset-password")
-async def reset_password(request: Request):
-    if db is None:
-        raise HTTPException(status_code=503, detail="Database not configured")
-    body     = await request.json()
-    token    = body.get("token", "").strip()
-    password = body.get("password", "")
-    if not token or not password:
-        raise HTTPException(status_code=400, detail="Token and new password are required.")
-    if len(password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
-    rec = db.password_resets.find_one({"token": token})
-    if not rec:
-        raise HTTPException(status_code=400, detail="Invalid or expired reset link.")
-    if datetime.utcnow() > rec["expires_at"]:
-        db.password_resets.delete_one({"token": token})
-        raise HTTPException(status_code=400, detail="This reset link has expired. Please request a new one.")
-    db.users.update_one({"email": rec["email"]}, {"$set": {"password": hash_password(password)}})
-    db.password_resets.delete_one({"token": token})
+    if email:
+        db.password_resets.delete_many({"email": email})
+        db.password_resets.insert_one({"email": email, "requested_at": datetime.utcnow()})
     return {"ok": True}
 
 
@@ -471,11 +445,21 @@ async def admin_get_password_resets(request: Request):
     require_admin(request)
     if db is None:
         raise HTTPException(status_code=503, detail="Database not configured")
-    resets = list(db.password_resets.find({}, {"_id": 0, "email": 1, "token": 1, "expires_at": 1}))
+    resets = list(db.password_resets.find({}, {"_id": 0, "email": 1, "requested_at": 1}))
     for r in resets:
-        if isinstance(r.get("expires_at"), datetime):
-            r["expires_at"] = r["expires_at"].isoformat()
+        if isinstance(r.get("requested_at"), datetime):
+            r["requested_at"] = r["requested_at"].isoformat()
     return resets
+
+
+@app.delete("/api/admin/password-resets/{email}")
+async def admin_dismiss_password_reset(email: str, request: Request):
+    """Dismiss a password reset request once handled."""
+    require_admin(request)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    db.password_resets.delete_many({"email": email.lower()})
+    return {"ok": True}
 
 
 # ─── MongoDB Cycle Save ────────────────────────────────────────

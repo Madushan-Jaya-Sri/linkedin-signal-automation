@@ -709,9 +709,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
               <button class="btn btn-ghost btn-sm" onclick="loadPasswordResets()">Refresh</button>
             </div>
             <div class="card-body">
-              <p style="font-size:0.78rem;color:#64748b;margin-bottom:12px">Users who requested a password reset. Copy the link and share it with the user. Links expire after 1 hour.</p>
+              <p style="font-size:0.78rem;color:#64748b;margin-bottom:12px">Users who requested a password reset. Revoke their account, create a new one, and share the new credentials with them manually.</p>
               <table class="data-table">
-                <thead><tr><th>User Email</th><th>Expires</th><th>Reset Link</th></tr></thead>
+                <thead><tr><th>User Email</th><th>Requested At</th><th>Action</th></tr></thead>
                 <tbody id="resetRequestsBody"><tr class="empty-row"><td colspan="3">Loading…</td></tr></tbody>
               </table>
             </div>
@@ -1519,29 +1519,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     const list = await res.json();
     if (!list.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="3">No pending reset requests.</td></tr>'; return; }
     tbody.innerHTML = list.map(r => {
-      const expires = r.expires_at ? new Date(r.expires_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + ' · ' + new Date(r.expires_at).toLocaleDateString() : '—';
-      const link = `${location.origin}${location.pathname}?reset=${r.token}`;
+      const when = r.requested_at ? new Date(r.requested_at).toLocaleString([], {dateStyle:'medium', timeStyle:'short'}) : '—';
       return `<tr>
         <td style="font-size:0.85rem;font-weight:600;color:#0f172a">${esc(r.email)}</td>
-        <td style="font-size:0.78rem;color:#64748b">${expires}</td>
+        <td style="font-size:0.78rem;color:#64748b">${when}</td>
         <td>
-          <button onclick="copyResetLink('${r.token}',this)"
-            style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:0.78rem;font-weight:600;cursor:pointer">
-            Copy Link
+          <button onclick="dismissPasswordReset('${esc(r.email)}',this)"
+            style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:6px;padding:5px 12px;font-size:0.78rem;font-weight:600;cursor:pointer">
+            Dismiss
           </button>
         </td>
       </tr>`;
     }).join('');
   }
 
-  function copyResetLink(token, btn) {
-    const link = `${location.origin}${location.pathname}?reset=${token}`;
-    navigator.clipboard.writeText(link).then(() => {
-      const orig = btn.textContent;
-      btn.textContent = '✓ Copied!';
-      btn.style.background = '#10b981';
-      setTimeout(() => { btn.textContent = orig; btn.style.background = '#6366f1'; }, 2000);
+  async function dismissPasswordReset(email, btn) {
+    btn.disabled = true; btn.textContent = '…';
+    const res = await fetch(`/api/admin/password-resets/${encodeURIComponent(email)}`, {
+      method: 'DELETE', headers: { 'X-Admin-Secret': adminSecret }
     });
+    if (res.ok) loadPasswordResets();
+    else { btn.disabled = false; btn.textContent = 'Dismiss'; }
   }
 
   // ── INIT ──────────────────────────────────────────

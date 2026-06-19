@@ -281,6 +281,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .copy-btn:hover { background: #f0f4ff; border-color: #c7d2fe; color: #6366f1; }
 .drawer-empty { padding: 48px; text-align: center; color: #94a3b8; font-size: 0.85rem; }
 .drawer-loading { padding: 48px; text-align: center; color: #94a3b8; font-size: 0.85rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -602,12 +603,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
               </div>
             </div>
             <div class="card-body" style="padding:24px">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:520px">
-                <div>
-                  <label style="display:block;font-size:0.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Max Profiles per Search</label>
-                  <input type="number" id="set-max-items" min="1" max="100" style="width:100%;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:9px;padding:10px 14px;font-size:0.9rem;outline:none">
-                  <div style="font-size:0.72rem;color:#94a3b8;margin-top:4px">Max LinkedIn profiles scraped per search (1–100)</div>
-                </div>
+              <div style="max-width:260px">
                 <div>
                   <label style="display:block;font-size:0.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Max Posts per Profile</label>
                   <input type="number" id="set-max-posts" min="1" max="50" style="width:100%;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:9px;padding:10px 14px;font-size:0.9rem;outline:none">
@@ -646,8 +642,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
               <div style="display:flex;flex-direction:column;gap:14px" id="planToggleList">
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px">
                   <div>
-                    <span class="pill" style="background:#dbeafe;color:#1d4ed8;margin-right:10px">Starter</span>
-                    <span style="font-size:0.8rem;color:#64748b">25 profiles / month — $9/mo</span>
+                    <span class="pill" style="background:#dbeafe;color:#1d4ed8;margin-right:10px">Free</span>
+                    <span style="font-size:0.8rem;color:#64748b">25 profiles / week — 7-day trial</span>
+                  </div>
+                  <label class="toggle-wrap">
+                    <div class="toggle-switch">
+                      <input type="checkbox" id="plan-toggle-free">
+                      <div class="toggle-track"></div>
+                      <div class="toggle-thumb"></div>
+                    </div>
+                    <span class="toggle-label" id="plan-lbl-free">—</span>
+                  </label>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px">
+                  <div>
+                    <span class="pill" style="background:#fef3c7;color:#92400e;margin-right:10px">Starter</span>
+                    <span style="font-size:0.8rem;color:#64748b">50 profiles / month</span>
                   </div>
                   <label class="toggle-wrap">
                     <div class="toggle-switch">
@@ -661,7 +671,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px">
                   <div>
                     <span class="pill" style="background:#dcfce7;color:#15803d;margin-right:10px">Growth</span>
-                    <span style="font-size:0.8rem;color:#64748b">50 profiles / month — $39/mo</span>
+                    <span style="font-size:0.8rem;color:#64748b">100 profiles / month</span>
                   </div>
                   <label class="toggle-wrap">
                     <div class="toggle-switch">
@@ -675,7 +685,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px">
                   <div>
                     <span class="pill" style="background:#fae8ff;color:#7e22ce;margin-right:10px">Pro</span>
-                    <span style="font-size:0.8rem;color:#64748b">100 profiles / month — $79/mo</span>
+                    <span style="font-size:0.8rem;color:#64748b">Custom profiles / month</span>
                   </div>
                   <label class="toggle-wrap">
                     <div class="toggle-switch">
@@ -688,6 +698,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
                 </div>
               </div>
               <span id="plansSaved" style="font-size:0.8rem;color:#16a34a;display:none;margin-top:10px;display:none">✓ Plan settings saved!</span>
+            </div>
+          </div>
+          <div class="card" style="margin-top:20px">
+            <div class="card-head">
+              <div class="card-head-title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Password Reset Requests
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="loadPasswordResets()">Refresh</button>
+            </div>
+            <div class="card-body">
+              <p style="font-size:0.78rem;color:#64748b;margin:0;padding:14px 22px 12px">Users who requested a password reset. Revoke their account, create a new one, and share the new credentials with them manually.</p>
+              <table class="data-table">
+                <thead><tr><th>User Email</th><th>Requested At</th><th>Action</th></tr></thead>
+                <tbody id="resetRequestsBody"><tr class="empty-row"><td colspan="3">Loading…</td></tr></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1132,7 +1158,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     if (navEl) navEl.classList.add('active');
     document.getElementById('topbarTitle').textContent = PAGE_TITLES[page] || page;
     if (page === 'costs') loadCosts();
-    if (page === 'settings') { loadSettings(); loadPlanTable(); }
+    if (page === 'settings') { loadSettings(); loadPlanTable(); loadPasswordResets(); }
     if (page === 'pending') loadPending();
   }
 
@@ -1332,16 +1358,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   }
 
   // ── SETTINGS ──────────────────────────────────────
-  let enabledPlans = ['growth'];
+  let enabledPlans = ['free', 'starter', 'growth', 'pro'];
 
   async function loadSettings() {
     const res = await fetch('/api/admin/settings', { headers: { 'X-Admin-Secret': adminSecret } });
     if (!res.ok) return;
     const s = await res.json();
-    document.getElementById('set-max-items').value = s.max_items ?? 50;
-    document.getElementById('set-max-posts').value  = s.max_posts  ?? 10;
-    enabledPlans = s.enabled_plans || ['growth'];
-    ['starter', 'growth', 'pro'].forEach(p => {
+    document.getElementById('set-max-posts').value = s.max_posts ?? 10;
+    enabledPlans = s.enabled_plans || ['free', 'starter', 'growth', 'pro'];
+    ['free', 'starter', 'growth', 'pro'].forEach(p => {
       const cb = document.getElementById(`plan-toggle-${p}`);
       const lbl = document.getElementById(`plan-lbl-${p}`);
       const on = enabledPlans.includes(p);
@@ -1354,8 +1379,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     const btn = document.getElementById('saveSettingsBtn');
     btn.disabled = true; btn.textContent = 'Saving...';
     const body = {
-      max_items: parseInt(document.getElementById('set-max-items').value) || 50,
-      max_posts:  parseInt(document.getElementById('set-max-posts').value)  || 10,
+      max_posts: parseInt(document.getElementById('set-max-posts').value) || 10,
     };
     const res = await fetch('/api/admin/settings', {
       method: 'PUT', headers: { 'X-Admin-Secret': adminSecret, 'Content-Type': 'application/json' },
@@ -1371,14 +1395,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   async function savePlanToggles() {
     const btn = document.getElementById('savePlansBtn');
     btn.disabled = true; btn.textContent = 'Saving...';
-    const plans = ['starter', 'growth', 'pro'].filter(p => document.getElementById(`plan-toggle-${p}`)?.checked);
+    const plans = ['free', 'starter', 'growth', 'pro'].filter(p => document.getElementById(`plan-toggle-${p}`)?.checked);
     const res = await fetch('/api/admin/settings', {
       method: 'PUT', headers: { 'X-Admin-Secret': adminSecret, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled_plans: plans.length ? plans : ['growth'] })
+      body: JSON.stringify({ enabled_plans: plans.length ? plans : ['free'] })
     });
     btn.disabled = false; btn.textContent = 'Save Plan Settings';
     if (res.ok) {
-      enabledPlans = plans.length ? plans : ['growth'];
+      enabledPlans = plans.length ? plans : ['free'];
       const ok = document.getElementById('plansSaved');
       ok.style.display = 'inline'; setTimeout(() => ok.style.display = 'none', 2500);
       loadPlanTable();
@@ -1389,40 +1413,133 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     const res = await fetch('/api/admin/usage', { headers: { 'X-Admin-Secret': adminSecret } });
     if (!res.ok) return;
     const list = await res.json();
-    const PLAN_COLORS = { starter: 'background:#dbeafe;color:#1d4ed8', growth: 'background:#dcfce7;color:#15803d', pro: 'background:#fae8ff;color:#7e22ce' };
+    const PLAN_COLORS = { free: 'background:#dbeafe;color:#1d4ed8', starter: 'background:#fef3c7;color:#92400e', growth: 'background:#dcfce7;color:#15803d', pro: 'background:#fae8ff;color:#7e22ce' };
     const body = document.getElementById('planTableBody');
     if (!list.length) { body.innerHTML = '<tr class="empty-row"><td colspan="4">No users</td></tr>'; return; }
     body.innerHTML = list.map(u => {
-      const pct   = Math.min(100, Math.round((u.used / u.limit) * 100));
+      const pct   = u.limit ? Math.min(100, Math.round((u.used / u.limit) * 100)) : 0;
       const color = u.remaining === 0 ? '#ef4444' : u.remaining <= 5 ? '#f59e0b' : '#10b981';
+      const planName = (u.plan||'free').charAt(0).toUpperCase()+(u.plan||'free').slice(1);
+      const periodLabel = u.period === 'week' ? '/wk' : '/mo';
+      const trialBadge = u.plan === 'free'
+        ? (u.trial_expired
+            ? `<span style="font-size:0.65rem;color:#ef4444;font-weight:700;display:block;margin-top:2px">⛔ Trial expired</span>`
+            : `<span style="font-size:0.65rem;color:#f59e0b;font-weight:600;display:block;margin-top:2px">Trial · expires ${u.trial_expires_at ? new Date(u.trial_expires_at).toLocaleDateString() : '—'}</span>`)
+        : '';
+      const emailKey = u.email.replace(/[^a-z0-9]/gi, '_');
       return `<tr>
         <td><div style="font-size:0.85rem;font-weight:600;color:#0f172a">${esc(u.name)}</div><div style="font-size:0.72rem;color:#94a3b8">${esc(u.email)}</div></td>
-        <td><span class="pill" style="${PLAN_COLORS[u.plan] || ''}">${(u.plan||'growth').charAt(0).toUpperCase()+(u.plan||'growth').slice(1)}</span></td>
+        <td id="plan-badge-${emailKey}"><span class="pill" style="${PLAN_COLORS[u.plan] || ''}">${planName}</span>${trialBadge}</td>
         <td>
           <div style="display:flex;align-items:center;gap:8px;min-width:120px">
             <div style="flex:1;background:#f1f5f9;border-radius:4px;height:6px;overflow:hidden">
               <div style="width:${pct}%;background:${color};height:100%;border-radius:4px"></div>
             </div>
-            <span style="font-size:0.72rem;color:${color};font-weight:700;white-space:nowrap">${u.used}/${u.limit}</span>
+            <span style="font-size:0.72rem;color:${color};font-weight:700;white-space:nowrap">${u.used}/${u.limit}${periodLabel}</span>
           </div>
         </td>
         <td>
-          <select onchange="setPlan('${esc(u.email)}', this.value, this)" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:0.78rem;cursor:pointer">
-            ${enabledPlans.includes('starter') ? `<option value="starter" ${u.plan==='starter'?'selected':''}>Starter (25)</option>` : ''}
-            ${enabledPlans.includes('growth')  ? `<option value="growth"  ${u.plan==='growth' ?'selected':''}>Growth (50)</option>`  : ''}
-            ${enabledPlans.includes('pro')     ? `<option value="pro"     ${u.plan==='pro'    ?'selected':''}>Pro (100)</option>`     : ''}
-          </select>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <select id="plan-sel-${emailKey}" data-current="${u.plan||'free'}" onchange="onPlanSelectChange('${emailKey}')" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:0.78rem;cursor:pointer">
+              ${enabledPlans.includes('free')    ? `<option value="free"    ${u.plan==='free'   ?'selected':''}>Free (25/wk trial)</option>`  : ''}
+              ${enabledPlans.includes('starter') ? `<option value="starter" ${u.plan==='starter'?'selected':''}>Starter (50/mo)</option>`      : ''}
+              ${enabledPlans.includes('growth')  ? `<option value="growth"  ${u.plan==='growth' ?'selected':''}>Growth (100/mo)</option>`      : ''}
+              ${enabledPlans.includes('pro')     ? `<option value="pro"     ${u.plan==='pro'    ?'selected':''}>Pro (custom/mo)</option>`      : ''}
+            </select>
+            <input type="number" id="pro-limit-${emailKey}" placeholder="limit" min="1"
+              style="display:${u.plan==='pro'?'inline-block':'none'};width:72px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:0.78rem"
+              value="${u.pro_limit||''}">
+            <button id="plan-btn-${emailKey}" onclick="setPlan('${esc(u.email)}','${emailKey}',this)" disabled
+              style="background:#4f6af6;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:0.78rem;font-weight:600;opacity:0.4;cursor:not-allowed">Set</button>
+          </div>
         </td>
       </tr>`;
     }).join('');
   }
 
-  async function setPlan(email, plan, sel) {
+  function onPlanSelectChange(key) {
+    const sel = document.getElementById(`plan-sel-${key}`);
+    const btn = document.getElementById(`plan-btn-${key}`);
+    const li  = document.getElementById(`pro-limit-${key}`);
+    if (li) li.style.display = sel.value === 'pro' ? 'inline-block' : 'none';
+    const changed = sel.value !== sel.dataset.current;
+    btn.disabled = !changed;
+    btn.style.opacity  = changed ? '1'           : '0.4';
+    btn.style.cursor   = changed ? 'pointer'     : 'not-allowed';
+  }
+
+  async function setPlan(email, key, btn) {
+    const sel  = document.getElementById(`plan-sel-${key}`);
+    const plan = sel.value;
+    const body = { plan };
+    if (plan === 'pro') {
+      const li = document.getElementById(`pro-limit-${key}`);
+      const v  = parseInt(li?.value);
+      if (!v || v < 1) { alert('Enter a valid custom profile limit for Pro plan.'); return; }
+      body.pro_limit = v;
+    }
+    btn.disabled = true;
+    btn.style.opacity = '1';
+    btn.style.cursor  = 'not-allowed';
+    btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:spin 0.7s linear infinite"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>Saving…</span>';
     const res = await fetch(`/api/admin/users/${encodeURIComponent(email)}/plan`, {
       method: 'PUT', headers: { 'X-Admin-Secret': adminSecret, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan })
+      body: JSON.stringify(body)
     });
-    if (res.ok) { sel.style.borderColor = '#10b981'; setTimeout(() => sel.style.borderColor = '', 1500); loadAll(); }
+    if (res.ok) {
+      // Update the plan badge and button simultaneously
+      const PLAN_COLORS = { free: 'background:#dbeafe;color:#1d4ed8', starter: 'background:#fef3c7;color:#92400e', growth: 'background:#dcfce7;color:#15803d', pro: 'background:#fae8ff;color:#7e22ce' };
+      const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
+      const badge = document.getElementById(`plan-badge-${key}`);
+      if (badge) badge.innerHTML = `<span class="pill" style="${PLAN_COLORS[plan] || ''}">${planName}</span>`;
+      sel.dataset.current = plan;
+      btn.innerHTML = '✓ Done';
+      btn.style.background = '#10b981';
+      setTimeout(() => {
+        btn.innerHTML = 'Set';
+        btn.style.background = '#4f6af6';
+        btn.style.opacity  = '0.4';
+        btn.style.cursor   = 'not-allowed';
+      }, 1500);
+    } else {
+      btn.innerHTML = 'Set';
+      btn.disabled = false;
+      btn.style.background = '#ef4444';
+      btn.style.opacity = '1';
+      btn.style.cursor  = 'pointer';
+      setTimeout(() => { btn.style.background = '#4f6af6'; btn.style.opacity = '0.4'; btn.style.cursor = 'not-allowed'; btn.disabled = true; }, 1500);
+    }
+  }
+
+  async function loadPasswordResets() {
+    const tbody = document.getElementById('resetRequestsBody');
+    if (!tbody) return;
+    const res = await fetch('/api/admin/password-resets', { headers: { 'X-Admin-Secret': adminSecret } });
+    if (!res.ok) { tbody.innerHTML = '<tr class="empty-row"><td colspan="3">Failed to load.</td></tr>'; return; }
+    const list = await res.json();
+    if (!list.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="3">No pending reset requests.</td></tr>'; return; }
+    tbody.innerHTML = list.map(r => {
+      const when = r.requested_at ? new Date(r.requested_at).toLocaleString('en-GB', {timeZone:'Asia/Colombo', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '—';
+      return `<tr>
+        <td style="font-size:0.85rem;font-weight:600;color:#0f172a">${esc(r.email)}</td>
+        <td style="font-size:0.78rem;color:#64748b">${when}</td>
+        <td>
+          <button onclick="dismissPasswordReset('${esc(r.email)}',this)"
+            style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:6px;padding:5px 12px;font-size:0.78rem;font-weight:600;cursor:pointer">
+            Dismiss
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function dismissPasswordReset(email, btn) {
+    btn.disabled = true; btn.textContent = '…';
+    const res = await fetch(`/api/admin/password-resets/${encodeURIComponent(email)}`, {
+      method: 'DELETE', headers: { 'X-Admin-Secret': adminSecret }
+    });
+    if (res.ok) loadPasswordResets();
+    else { btn.disabled = false; btn.textContent = 'Dismiss'; }
   }
 
   // ── INIT ──────────────────────────────────────────

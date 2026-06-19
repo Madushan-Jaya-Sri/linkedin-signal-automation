@@ -418,7 +418,33 @@
       </div>
       <div class="auth-form-err" id="siFormErr"></div>
       <button class="btn-auth" id="siBtn" onclick="handleSignin()">Sign In</button>
-      <p style="text-align:center;margin-top:14px;font-size:12px;color:#888;">Developed by Momentro Labs. v2</p>
+      <p style="text-align:center;margin-top:12px;font-size:0.8rem;">
+        <a href="#" onclick="showForgotForm();return false;" style="color:#6366f1;text-decoration:none;font-weight:500">Forgot password?</a>
+      </p>
+      <p style="text-align:center;margin-top:6px;font-size:12px;color:#888;">Developed by Momentro Labs. v2</p>
+    </div>
+
+    <!-- FORGOT PASSWORD -->
+    <div id="forgotForm" style="display:none">
+      <p style="font-size:0.85rem;color:#64748b;margin-bottom:16px">Enter your email address and we'll generate a reset link for you.</p>
+      <div class="auth-field">
+        <label>Email</label>
+        <input class="auth-input" type="email" id="fpEmail" placeholder="you@example.com" autocomplete="email" onkeydown="if(event.key==='Enter') handleForgotPassword()">
+        <span class="auth-err" id="fpEmailErr"></span>
+      </div>
+      <div class="auth-form-err" id="fpFormErr"></div>
+      <button class="btn-auth" id="fpBtn" onclick="handleForgotPassword()">Send Reset Link</button>
+      <p style="text-align:center;margin-top:12px;font-size:0.8rem;">
+        <a href="#" onclick="showSigninForm();return false;" style="color:#6366f1;text-decoration:none;font-weight:500">← Back to Sign In</a>
+      </p>
+    </div>
+
+    <!-- FORGOT PASSWORD SUCCESS -->
+    <div id="forgotSuccess" style="display:none;text-align:center;padding:8px 0">
+      <div style="width:52px;height:52px;background:#ede9fe;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:1.5rem">✉️</div>
+      <p style="font-size:1rem;font-weight:700;color:#0f172a;margin-bottom:10px">Request received</p>
+      <p style="font-size:0.85rem;color:#64748b;line-height:1.6">A member of the Lead Intel team will contact you shortly.</p>
+      <button class="btn-auth" style="margin-top:22px" onclick="showSigninForm()">OK</button>
     </div>
   </div>
 </div>
@@ -2040,8 +2066,34 @@
     }
   }
 
-  function switchAuthTab() {
-    clearAuthErrors();
+  function switchAuthTab() { clearAuthErrors(); }
+
+  // ── Auth panel navigation ──────────────────────────────────
+  const AUTH_PANELS = ['signinForm','forgotForm','forgotSuccess'];
+  function showAuthPanel(id) {
+    AUTH_PANELS.forEach(p => { const el = document.getElementById(p); if (el) el.style.display = p === id ? '' : 'none'; });
+  }
+  function showSigninForm() { showAuthPanel('signinForm'); }
+  function showForgotForm() { showAuthPanel('forgotForm'); document.getElementById('fpEmail').value = document.getElementById('siEmail').value || ''; }
+
+  async function handleForgotPassword() {
+    const email = document.getElementById('fpEmail').value.trim();
+    const errEl = document.getElementById('fpEmailErr');
+    errEl.textContent = '';
+    if (!validateEmail(email)) { errEl.textContent = 'Enter a valid email address'; return; }
+    const btn = document.getElementById('fpBtn');
+    btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      await fetch('/api/auth/forgot-password', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ email }),
+      });
+      showAuthPanel('forgotSuccess');
+    } catch(e) {
+      document.getElementById('fpFormErr').textContent = 'Network error. Please try again.';
+      document.getElementById('fpFormErr').classList.add('visible');
+    }
+    btn.disabled = false; btn.textContent = 'Send Reset Link';
   }
 
   async function loadUsage() {
@@ -2051,17 +2103,25 @@
       const data = await res.json();
       const el = document.getElementById('usageBadge');
       if (!el) return;
-      if (data.remaining === 0) {
-        el.innerHTML = `<span style="color:#ff6b6b;font-size:0.92rem;font-weight:800;letter-spacing:0.01em">⚠ You've reached your limit for this month.</span>`;
+      if (data.trial_expired) {
+        el.innerHTML = `<span style="color:#ff6b6b;font-size:0.92rem;font-weight:800;letter-spacing:0.01em">⛔ Your free trial has expired. Please upgrade to continue.</span>`;
+      } else if (data.remaining === 0) {
+        const periodWord = data.period === 'week' ? 'this week' : 'this month';
+        el.innerHTML = `<span style="color:#ff6b6b;font-size:0.92rem;font-weight:800;letter-spacing:0.01em">⚠ You've reached your limit for ${periodWord}.</span>`;
       } else {
-        const planLabel = { starter: 'Starter', growth: 'Growth', pro: 'Pro' }[data.plan] || 'Growth';
-        const planColor = { starter: '#2563eb', growth: '#16a34a', pro: '#7c3aed' }[data.plan] || '#16a34a';
+        const planLabel = { free: 'Free Trial', starter: 'Starter', growth: 'Growth', pro: 'Pro' }[data.plan] || 'Free';
+        const planColor = { free: '#2563eb', starter: '#d97706', growth: '#16a34a', pro: '#7c3aed' }[data.plan] || '#2563eb';
+        const periodWord = data.period === 'week' ? 'this week' : 'this month';
         const pct = data.limit > 0 ? Math.min(100, Math.round((data.used / data.limit) * 100)) : 0;
         const barColor = pct >= 85 ? '#e74c3c' : pct >= 60 ? '#f39c12' : '#27ae60';
+        const trialNote = (data.plan === 'free' && data.trial_days_left !== null)
+          ? `<span style="color:rgba(255,220,100,0.95);font-size:0.7rem;font-weight:600">${data.trial_days_left === 0 ? 'Last day of trial' : `${data.trial_days_left}d left in trial`}</span>`
+          : '';
         el.innerHTML = `
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span style="background:${planColor};color:#fff;border-radius:4px;padding:1px 7px;font-size:0.68rem;font-weight:700">${planLabel}</span>
-            <span style="color:rgba(255,255,255,0.9);font-size:0.73rem;font-weight:500">${data.used} / ${data.limit} profiles this month</span>
+            <span style="color:rgba(255,255,255,0.9);font-size:0.73rem;font-weight:500">${data.used} / ${data.limit} profiles ${periodWord}</span>
+            ${trialNote}
           </div>
           <div style="margin-top:5px;width:200px;max-width:100%;background:rgba(255,255,255,0.2);border-radius:6px;height:5px;overflow:hidden">
             <div style="width:${pct}%;height:100%;background:${barColor};border-radius:6px;transition:width 0.4s ease"></div>

@@ -254,9 +254,8 @@ async def admin_get_settings(request: Request):
     """Get system settings."""
     require_admin(request)
     return {
-        "max_items":     get_setting("max_items", 50),
         "max_posts":     get_setting("max_posts",  10),
-        "enabled_plans": get_setting("enabled_plans", ["growth"]),
+        "enabled_plans": get_setting("enabled_plans", ["free", "growth", "pro"]),
     }
 
 
@@ -267,14 +266,13 @@ async def admin_update_settings(request: Request):
     if db is None:
         raise HTTPException(status_code=503, detail="Database not configured")
     body = await request.json()
-    for key in ["max_items", "max_posts"]:
-        if key in body:
-            val = int(body[key])
-            db.settings.update_one({"key": key}, {"$set": {"key": key, "value": val}}, upsert=True)
+    if "max_posts" in body:
+        val = int(body["max_posts"])
+        db.settings.update_one({"key": "max_posts"}, {"$set": {"key": "max_posts", "value": val}}, upsert=True)
     if "enabled_plans" in body:
         plans = [p for p in body["enabled_plans"] if p in PLAN_LIMITS]
         if not plans:
-            plans = ["growth"]  # always keep at least one plan
+            plans = ["free"]  # always keep at least one plan
         db.settings.update_one({"key": "enabled_plans"}, {"$set": {"key": "enabled_plans", "value": plans}}, upsert=True)
     return {"ok": True}
 
@@ -624,8 +622,8 @@ async def start_search(request: Request, user: dict = Depends(get_current_user))
             detail=f"Monthly limit reached ({used}/{limit}) on your {plan.title()} plan. Upgrade or wait for next month."
         )
 
-    # Cap maxItems from system settings
-    params["maxItems"] = get_setting("max_items", 50)
+    # Cap maxItems by the user's plan limit
+    params["maxItems"] = limit
 
     job_id = str(uuid.uuid4())[:8]
     jobs[job_id] = {
@@ -662,8 +660,8 @@ async def get_progress(job_id: str):
 
 
 # ─── Plan System ───────────────────────────────────────────────
-PLAN_LIMITS = {"starter": 25, "growth": 50, "pro": 100}
-DEFAULT_PLAN = "growth"
+PLAN_LIMITS = {"free": 25, "growth": 50, "pro": 100}
+DEFAULT_PLAN = "free"
 
 
 def get_setting(key: str, default):
@@ -682,8 +680,7 @@ def get_user_plan(email: str) -> str:
 
 
 def get_plan_limit(plan: str) -> int:
-    base = PLAN_LIMITS.get(plan, PLAN_LIMITS[DEFAULT_PLAN])
-    return get_setting("max_items", base)
+    return PLAN_LIMITS.get(plan, PLAN_LIMITS[DEFAULT_PLAN])
 
 
 def get_monthly_analyzed(email: str) -> int:

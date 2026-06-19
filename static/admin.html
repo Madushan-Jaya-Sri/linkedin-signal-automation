@@ -709,7 +709,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
               <button class="btn btn-ghost btn-sm" onclick="loadPasswordResets()">Refresh</button>
             </div>
             <div class="card-body">
-              <p style="font-size:0.78rem;color:#64748b;margin:0 0 12px 2px">Users who requested a password reset. Revoke their account, create a new one, and share the new credentials with them manually.</p>
+              <p style="font-size:0.78rem;color:#64748b;margin:0;padding:14px 22px 12px">Users who requested a password reset. Revoke their account, create a new one, and share the new credentials with them manually.</p>
               <table class="data-table">
                 <thead><tr><th>User Email</th><th>Requested At</th><th>Action</th></tr></thead>
                 <tbody id="resetRequestsBody"><tr class="empty-row"><td colspan="3">Loading…</td></tr></tbody>
@@ -1519,7 +1519,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     const list = await res.json();
     if (!list.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="3">No pending reset requests.</td></tr>'; return; }
     tbody.innerHTML = list.map(r => {
-      const when = r.requested_at ? new Date(r.requested_at).toLocaleString([], {dateStyle:'medium', timeStyle:'short'}) : '—';
+      const when = r.requested_at ? new Date(r.requested_at).toLocaleString('en-GB', {timeZone:'Asia/Colombo', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '—';
       return `<tr>
         <td style="font-size:0.85rem;font-weight:600;color:#0f172a">${esc(r.email)}</td>
         <td style="font-size:0.78rem;color:#64748b">${when}</td>

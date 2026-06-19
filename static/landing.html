@@ -416,6 +416,36 @@ footer span { color: #6366f1; font-weight: 600; }
           <div class="field-err" id="si-pass-err"></div>
         </div>
         <button class="submit-btn" id="si-btn" onclick="doSignin()">Sign In</button>
+        <p style="text-align:center;margin-top:12px;font-size:0.82rem">
+          <a href="#" onclick="showForgotPanel();return false;" style="color:#6366f1;text-decoration:none;font-weight:500">Forgot password?</a>
+        </p>
+      </div>
+
+      <!-- FORGOT PASSWORD -->
+      <div class="form-panel" id="panel-forgot">
+        <p style="font-size:0.85rem;color:#64748b;margin-bottom:16px">Enter your email and we'll generate a reset link for your administrator to share with you.</p>
+        <div class="form-err" id="fp-err"></div>
+        <div class="field">
+          <label>Email Address</label>
+          <input type="email" id="fp-email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')doForgotPassword()">
+          <div class="field-err" id="fp-email-err"></div>
+        </div>
+        <button class="submit-btn" id="fp-btn" onclick="doForgotPassword()">Send Reset Link</button>
+        <p style="text-align:center;margin-top:12px;font-size:0.82rem">
+          <a href="#" onclick="showSigninPanel();return false;" style="color:#6366f1;text-decoration:none;font-weight:500">← Back to Sign In</a>
+        </p>
+      </div>
+
+      <!-- FORGOT SUCCESS -->
+      <div class="form-panel" id="panel-forgot-success">
+        <div style="text-align:center;padding:12px 0">
+          <div style="width:48px;height:48px;background:#dcfce7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:1.4rem">✓</div>
+          <p style="font-size:0.95rem;font-weight:700;color:#0f172a;margin-bottom:8px">Reset link generated</p>
+          <p style="font-size:0.82rem;color:#64748b;line-height:1.55">Contact your administrator — they can copy the reset link from the admin panel and share it with you.</p>
+          <p style="margin-top:18px;font-size:0.82rem">
+            <a href="#" onclick="showSigninPanel();return false;" style="color:#6366f1;text-decoration:none;font-weight:500">← Back to Sign In</a>
+          </p>
+        </div>
       </div>
 
       <!-- SIGN UP FORM -->
@@ -465,8 +495,42 @@ footer span { color: #6366f1; font-weight: 600; }
   function switchTab(tab) {
     ['signin','signup'].forEach(t => {
       document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
-      document.getElementById(`panel-${t}`).classList.toggle('active', t === tab);
     });
+    showSigninPanel();
+    if (tab === 'signup') {
+      document.getElementById('panel-signin').classList.remove('active');
+      document.getElementById('panel-signup').classList.add('active');
+    }
+  }
+
+  const MODAL_PANELS = ['panel-signin','panel-forgot','panel-forgot-success','panel-signup'];
+  function showModalPanel(id) {
+    MODAL_PANELS.forEach(p => document.getElementById(p).classList.toggle('active', p === id));
+  }
+  function showSigninPanel()  { showModalPanel('panel-signin'); }
+  function showForgotPanel()  {
+    showModalPanel('panel-forgot');
+    document.getElementById('fp-email').value = document.getElementById('si-email').value || '';
+  }
+
+  async function doForgotPassword() {
+    const email = document.getElementById('fp-email').value.trim();
+    document.getElementById('fp-email-err').textContent = '';
+    document.getElementById('fp-err').textContent = '';
+    document.getElementById('fp-err').classList.remove('show');
+    if (!email) { document.getElementById('fp-email-err').textContent = 'Email is required'; return; }
+    const btn = document.getElementById('fp-btn');
+    btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      await fetch('/api/auth/forgot-password', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ email })
+      });
+      showModalPanel('panel-forgot-success');
+    } catch(e) {
+      showErr('fp-err', 'Network error. Please try again.');
+    }
+    btn.disabled = false; btn.textContent = 'Send Reset Link';
   }
 
   function clearErrors() {

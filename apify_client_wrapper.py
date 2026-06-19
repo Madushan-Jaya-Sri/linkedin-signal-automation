@@ -12,6 +12,13 @@ def get_client() -> ApifyClient:
     return ApifyClient(APIFY_API_TOKEN)
 
 
+def _get_dataset_id(run) -> str:
+    """Get defaultDatasetId from a run — works with both dict (old SDK) and dataclass (new SDK)."""
+    if isinstance(run, dict):
+        return run["defaultDatasetId"]
+    return getattr(run, "default_dataset_id", None) or getattr(run, "defaultDatasetId", None)
+
+
 # ─── Profile Parsing Helpers ─────────────────────────────────
 
 def _extract_email(item: dict) -> str:
@@ -211,7 +218,7 @@ def scrape_profiles_advanced(params: dict, progress_callback=None) -> list[dict]
     print("[INFO] Actor run complete — downloading dataset results...")
     results = []
     seen = set()
-    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+    for item in client.dataset(_get_dataset_id(run)).iterate_items():
         profile = _parse_profile(item)
         linkedin_url = profile["linkedin_url"]
         if linkedin_url and linkedin_url in seen:
@@ -316,7 +323,7 @@ def scrape_posts(linkedin_url: str, max_posts: int = 20) -> list[dict]:
     )
 
     posts = []
-    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+    for item in client.dataset(_get_dataset_id(run)).iterate_items():
         stats = item.get("stats", {}) or {}
         posted_at = item.get("posted_at", {}) or {}
         media = item.get("media", {}) or {}

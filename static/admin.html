@@ -1413,7 +1413,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       const emailKey = u.email.replace(/[^a-z0-9]/gi, '_');
       return `<tr>
         <td><div style="font-size:0.85rem;font-weight:600;color:#0f172a">${esc(u.name)}</div><div style="font-size:0.72rem;color:#94a3b8">${esc(u.email)}</div></td>
-        <td><span class="pill" style="${PLAN_COLORS[u.plan] || ''}">${planName}</span>${trialBadge}</td>
+        <td id="plan-badge-${emailKey}"><span class="pill" style="${PLAN_COLORS[u.plan] || ''}">${planName}</span>${trialBadge}</td>
         <td>
           <div style="display:flex;align-items:center;gap:8px;min-width:120px">
             <div style="flex:1;background:#f1f5f9;border-radius:4px;height:6px;overflow:hidden">
@@ -1424,7 +1424,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         </td>
         <td>
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <select id="plan-sel-${emailKey}" onchange="onPlanSelectChange('${esc(u.email)}','${emailKey}')" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:0.78rem;cursor:pointer">
+            <select id="plan-sel-${emailKey}" data-current="${u.plan||'free'}" onchange="onPlanSelectChange('${emailKey}')" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:0.78rem;cursor:pointer">
               ${enabledPlans.includes('free')    ? `<option value="free"    ${u.plan==='free'   ?'selected':''}>Free (25/wk trial)</option>`  : ''}
               ${enabledPlans.includes('starter') ? `<option value="starter" ${u.plan==='starter'?'selected':''}>Starter (50/mo)</option>`      : ''}
               ${enabledPlans.includes('growth')  ? `<option value="growth"  ${u.plan==='growth' ?'selected':''}>Growth (100/mo)</option>`      : ''}
@@ -1433,17 +1433,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
             <input type="number" id="pro-limit-${emailKey}" placeholder="limit" min="1"
               style="display:${u.plan==='pro'?'inline-block':'none'};width:72px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:0.78rem"
               value="${u.pro_limit||''}">
-            <button onclick="setPlan('${esc(u.email)}','${emailKey}',this)" style="background:#4f6af6;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:0.78rem;cursor:pointer;font-weight:600">Set</button>
+            <button id="plan-btn-${emailKey}" onclick="setPlan('${esc(u.email)}','${emailKey}',this)" disabled
+              style="background:#4f6af6;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:0.78rem;font-weight:600;opacity:0.4;cursor:not-allowed">Set</button>
           </div>
         </td>
       </tr>`;
     }).join('');
   }
 
-  function onPlanSelectChange(email, key) {
+  function onPlanSelectChange(key) {
     const sel = document.getElementById(`plan-sel-${key}`);
+    const btn = document.getElementById(`plan-btn-${key}`);
     const li  = document.getElementById(`pro-limit-${key}`);
     if (li) li.style.display = sel.value === 'pro' ? 'inline-block' : 'none';
+    const changed = sel.value !== sel.dataset.current;
+    btn.disabled = !changed;
+    btn.style.opacity  = changed ? '1'           : '0.4';
+    btn.style.cursor   = changed ? 'pointer'     : 'not-allowed';
   }
 
   async function setPlan(email, key, btn) {
@@ -1457,20 +1463,35 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       body.pro_limit = v;
     }
     btn.disabled = true;
+    btn.style.opacity = '1';
+    btn.style.cursor  = 'not-allowed';
     btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:spin 0.7s linear infinite"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>Saving…</span>';
     const res = await fetch(`/api/admin/users/${encodeURIComponent(email)}/plan`, {
       method: 'PUT', headers: { 'X-Admin-Secret': adminSecret, 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     if (res.ok) {
+      // Update the plan badge and button simultaneously
+      const PLAN_COLORS = { free: 'background:#dbeafe;color:#1d4ed8', starter: 'background:#fef3c7;color:#92400e', growth: 'background:#dcfce7;color:#15803d', pro: 'background:#fae8ff;color:#7e22ce' };
+      const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
+      const badge = document.getElementById(`plan-badge-${key}`);
+      if (badge) badge.innerHTML = `<span class="pill" style="${PLAN_COLORS[plan] || ''}">${planName}</span>`;
+      sel.dataset.current = plan;
       btn.innerHTML = '✓ Done';
       btn.style.background = '#10b981';
-      setTimeout(() => loadPlanTable(), 800);
+      setTimeout(() => {
+        btn.innerHTML = 'Set';
+        btn.style.background = '#4f6af6';
+        btn.style.opacity  = '0.4';
+        btn.style.cursor   = 'not-allowed';
+      }, 1500);
     } else {
       btn.innerHTML = 'Set';
       btn.disabled = false;
       btn.style.background = '#ef4444';
-      setTimeout(() => { btn.style.background = '#4f6af6'; }, 1500);
+      btn.style.opacity = '1';
+      btn.style.cursor  = 'pointer';
+      setTimeout(() => { btn.style.background = '#4f6af6'; btn.style.opacity = '0.4'; btn.style.cursor = 'not-allowed'; btn.disabled = true; }, 1500);
     }
   }
 

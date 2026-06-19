@@ -83,7 +83,9 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba
 
 /* ── PRICING ─────────────────────────────────────── */
 .pricing { padding: 80px 24px; background: var(--bg); }
-.pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; max-width: 900px; margin: 0 auto; }
+.pricing-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; max-width: 1120px; margin: 0 auto; }
+@media (max-width: 900px) { .pricing-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px) { .pricing-grid { grid-template-columns: 1fr; } }
 .price-card { background: var(--white); border: 1.5px solid var(--border); border-radius: 18px; padding: 32px 28px; position: relative; transition: all 0.2s; }
 .price-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,0.08); }
 .price-card.popular { background: linear-gradient(135deg, #4f46e5, #7c3aed); border-color: transparent; }
@@ -295,17 +297,48 @@ footer span { color: #6366f1; font-weight: 600; }
 <section class="pricing" id="pricing">
   <div class="section-inner">
     <div class="section-eyebrow">Pricing</div>
-    <h2 class="section-title">One plan. Everything included.</h2>
-    <p class="section-sub">Simple monthly pricing. No hidden fees. Reset every month.</p>
-    <div style="display:flex;justify-content:center">
+    <h2 class="section-title">Plans for every stage.</h2>
+    <p class="section-sub">Start free, scale as you grow. No hidden fees.</p>
+    <div class="pricing-grid">
 
-      <!-- Growth -->
-      <div class="price-card popular" style="max-width:380px;width:100%">
-        <div class="price-popular-badge">Growth Plan</div>
-        <div class="price-amount">$39<span>/mo</span></div>
-        <div class="price-desc">For sales teams and recruiters who need AI-powered LinkedIn prospecting at scale.</div>
+      <!-- Free -->
+      <div class="price-card">
+        <div class="price-plan">Free Trial</div>
+        <div class="price-amount">$0<span>/7 days</span></div>
+        <div class="price-desc">Try the platform risk-free. No credit card required.</div>
         <ul class="price-features">
-          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <strong>50 analyzed profiles / month</strong></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <strong>25 profiles / week</strong></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> AI relevance scoring</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Email extraction</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> AI outreach drafts</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Search history</li>
+        </ul>
+        <button class="price-btn" onclick="openModal('signup')">Get Started Free</button>
+      </div>
+
+      <!-- Starter -->
+      <div class="price-card">
+        <div class="price-plan">Starter</div>
+        <div class="price-amount">$19<span>/mo</span></div>
+        <div class="price-desc">Perfect for individuals exploring LinkedIn prospecting.</div>
+        <ul class="price-features">
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <strong>50 profiles / month</strong></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> AI relevance scoring</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Email extraction</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> AI outreach drafts</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> CSV export + search history</li>
+        </ul>
+        <button class="price-btn" onclick="openModal('signup')">Request Access</button>
+      </div>
+
+      <!-- Growth (popular) -->
+      <div class="price-card popular">
+        <div class="price-popular-badge">Most Popular</div>
+        <div class="price-plan">Growth</div>
+        <div class="price-amount">$39<span>/mo</span></div>
+        <div class="price-desc">For sales teams and recruiters who need prospecting at scale.</div>
+        <ul class="price-features">
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <strong>100 profiles / month</strong></li>
           <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> AI relevance scoring</li>
           <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Email extraction</li>
           <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> AI outreach drafts</li>
@@ -315,8 +348,24 @@ footer span { color: #6366f1; font-weight: 600; }
         <button class="price-btn popular-btn" onclick="openModal('signup')">Request Access</button>
       </div>
 
+      <!-- Pro -->
+      <div class="price-card">
+        <div class="price-plan">Pro</div>
+        <div class="price-amount" style="font-size:2rem">Custom</div>
+        <div class="price-desc">Tailored limits for agencies and high-volume teams.</div>
+        <ul class="price-features">
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <strong>Custom profile limit</strong></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> AI relevance scoring</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Email extraction</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> AI outreach drafts</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> CSV export + search history</li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Post activity insights</li>
+        </ul>
+        <button class="price-btn" onclick="openModal('signup')">Contact Us</button>
+      </div>
+
     </div>
-    <p style="text-align:center;font-size:0.8rem;color:#94a3b8;margin-top:24px">We review every signup to make sure Lead Intel stays high-quality and uncrowded. Most approvals happen within 24 hours.</p>
+    <p style="text-align:center;font-size:0.8rem;color:#94a3b8;margin-top:28px">We review every signup to keep Lead Intel high-quality. Most approvals happen within 24 hours.</p>
   </div>
 </section>
 

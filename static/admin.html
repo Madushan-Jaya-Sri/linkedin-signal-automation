@@ -700,6 +700,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
               <span id="plansSaved" style="font-size:0.8rem;color:#16a34a;display:none;margin-top:10px;display:none">✓ Plan settings saved!</span>
             </div>
           </div>
+          <div class="card" style="margin-top:20px">
+            <div class="card-head">
+              <div class="card-head-title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Password Reset Requests
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="loadPasswordResets()">Refresh</button>
+            </div>
+            <div class="card-body">
+              <p style="font-size:0.78rem;color:#64748b;margin-bottom:12px">Users who requested a password reset. Copy the link and share it with the user. Links expire after 1 hour.</p>
+              <table class="data-table">
+                <thead><tr><th>User Email</th><th>Expires</th><th>Reset Link</th></tr></thead>
+                <tbody id="resetRequestsBody"><tr class="empty-row"><td colspan="3">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <!-- ── PENDING APPROVALS PAGE ── -->
@@ -1142,7 +1158,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     if (navEl) navEl.classList.add('active');
     document.getElementById('topbarTitle').textContent = PAGE_TITLES[page] || page;
     if (page === 'costs') loadCosts();
-    if (page === 'settings') { loadSettings(); loadPlanTable(); }
+    if (page === 'settings') { loadSettings(); loadPlanTable(); loadPasswordResets(); }
     if (page === 'pending') loadPending();
   }
 
@@ -1493,6 +1509,39 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       btn.style.cursor  = 'pointer';
       setTimeout(() => { btn.style.background = '#4f6af6'; btn.style.opacity = '0.4'; btn.style.cursor = 'not-allowed'; btn.disabled = true; }, 1500);
     }
+  }
+
+  async function loadPasswordResets() {
+    const tbody = document.getElementById('resetRequestsBody');
+    if (!tbody) return;
+    const res = await fetch('/api/admin/password-resets', { headers: { 'X-Admin-Secret': adminSecret } });
+    if (!res.ok) { tbody.innerHTML = '<tr class="empty-row"><td colspan="3">Failed to load.</td></tr>'; return; }
+    const list = await res.json();
+    if (!list.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="3">No pending reset requests.</td></tr>'; return; }
+    tbody.innerHTML = list.map(r => {
+      const expires = r.expires_at ? new Date(r.expires_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + ' · ' + new Date(r.expires_at).toLocaleDateString() : '—';
+      const link = `${location.origin}${location.pathname}?reset=${r.token}`;
+      return `<tr>
+        <td style="font-size:0.85rem;font-weight:600;color:#0f172a">${esc(r.email)}</td>
+        <td style="font-size:0.78rem;color:#64748b">${expires}</td>
+        <td>
+          <button onclick="copyResetLink('${r.token}',this)"
+            style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:0.78rem;font-weight:600;cursor:pointer">
+            Copy Link
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  function copyResetLink(token, btn) {
+    const link = `${location.origin}${location.pathname}?reset=${token}`;
+    navigator.clipboard.writeText(link).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      btn.style.background = '#10b981';
+      setTimeout(() => { btn.textContent = orig; btn.style.background = '#6366f1'; }, 2000);
+    });
   }
 
   // ── INIT ──────────────────────────────────────────

@@ -642,7 +642,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px">
                   <div>
                     <span class="pill" style="background:#dbeafe;color:#1d4ed8;margin-right:10px">Free</span>
-                    <span style="font-size:0.8rem;color:#64748b">25 profiles / month</span>
+                    <span style="font-size:0.8rem;color:#64748b">25 profiles / week — 7-day trial</span>
                   </div>
                   <label class="toggle-wrap">
                     <div class="toggle-switch">
@@ -655,8 +655,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
                 </div>
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px">
                   <div>
+                    <span class="pill" style="background:#fef3c7;color:#92400e;margin-right:10px">Starter</span>
+                    <span style="font-size:0.8rem;color:#64748b">50 profiles / month</span>
+                  </div>
+                  <label class="toggle-wrap">
+                    <div class="toggle-switch">
+                      <input type="checkbox" id="plan-toggle-starter">
+                      <div class="toggle-track"></div>
+                      <div class="toggle-thumb"></div>
+                    </div>
+                    <span class="toggle-label" id="plan-lbl-starter">—</span>
+                  </label>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px">
+                  <div>
                     <span class="pill" style="background:#dcfce7;color:#15803d;margin-right:10px">Growth</span>
-                    <span style="font-size:0.8rem;color:#64748b">50 profiles / month — $39/mo</span>
+                    <span style="font-size:0.8rem;color:#64748b">100 profiles / month</span>
                   </div>
                   <label class="toggle-wrap">
                     <div class="toggle-switch">
@@ -670,7 +684,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px">
                   <div>
                     <span class="pill" style="background:#fae8ff;color:#7e22ce;margin-right:10px">Pro</span>
-                    <span style="font-size:0.8rem;color:#64748b">100 profiles / month — $79/mo</span>
+                    <span style="font-size:0.8rem;color:#64748b">Custom profiles / month</span>
                   </div>
                   <label class="toggle-wrap">
                     <div class="toggle-switch">
@@ -1327,15 +1341,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   }
 
   // ── SETTINGS ──────────────────────────────────────
-  let enabledPlans = ['free', 'growth', 'pro'];
+  let enabledPlans = ['free', 'starter', 'growth', 'pro'];
 
   async function loadSettings() {
     const res = await fetch('/api/admin/settings', { headers: { 'X-Admin-Secret': adminSecret } });
     if (!res.ok) return;
     const s = await res.json();
     document.getElementById('set-max-posts').value = s.max_posts ?? 10;
-    enabledPlans = s.enabled_plans || ['free', 'growth', 'pro'];
-    ['free', 'growth', 'pro'].forEach(p => {
+    enabledPlans = s.enabled_plans || ['free', 'starter', 'growth', 'pro'];
+    ['free', 'starter', 'growth', 'pro'].forEach(p => {
       const cb = document.getElementById(`plan-toggle-${p}`);
       const lbl = document.getElementById(`plan-lbl-${p}`);
       const on = enabledPlans.includes(p);
@@ -1364,7 +1378,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   async function savePlanToggles() {
     const btn = document.getElementById('savePlansBtn');
     btn.disabled = true; btn.textContent = 'Saving...';
-    const plans = ['free', 'growth', 'pro'].filter(p => document.getElementById(`plan-toggle-${p}`)?.checked);
+    const plans = ['free', 'starter', 'growth', 'pro'].filter(p => document.getElementById(`plan-toggle-${p}`)?.checked);
     const res = await fetch('/api/admin/settings', {
       method: 'PUT', headers: { 'X-Admin-Secret': adminSecret, 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled_plans: plans.length ? plans : ['free'] })
@@ -1382,38 +1396,68 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     const res = await fetch('/api/admin/usage', { headers: { 'X-Admin-Secret': adminSecret } });
     if (!res.ok) return;
     const list = await res.json();
-    const PLAN_COLORS = { free: 'background:#dbeafe;color:#1d4ed8', growth: 'background:#dcfce7;color:#15803d', pro: 'background:#fae8ff;color:#7e22ce' };
+    const PLAN_COLORS = { free: 'background:#dbeafe;color:#1d4ed8', starter: 'background:#fef3c7;color:#92400e', growth: 'background:#dcfce7;color:#15803d', pro: 'background:#fae8ff;color:#7e22ce' };
     const body = document.getElementById('planTableBody');
     if (!list.length) { body.innerHTML = '<tr class="empty-row"><td colspan="4">No users</td></tr>'; return; }
     body.innerHTML = list.map(u => {
-      const pct   = Math.min(100, Math.round((u.used / u.limit) * 100));
+      const pct   = u.limit ? Math.min(100, Math.round((u.used / u.limit) * 100)) : 0;
       const color = u.remaining === 0 ? '#ef4444' : u.remaining <= 5 ? '#f59e0b' : '#10b981';
+      const planName = (u.plan||'free').charAt(0).toUpperCase()+(u.plan||'free').slice(1);
+      const periodLabel = u.period === 'week' ? '/wk' : '/mo';
+      const trialBadge = u.plan === 'free'
+        ? (u.trial_expired
+            ? `<span style="font-size:0.65rem;color:#ef4444;font-weight:700;display:block;margin-top:2px">⛔ Trial expired</span>`
+            : `<span style="font-size:0.65rem;color:#f59e0b;font-weight:600;display:block;margin-top:2px">Trial · expires ${u.trial_expires_at ? new Date(u.trial_expires_at).toLocaleDateString() : '—'}</span>`)
+        : '';
+      const emailKey = u.email.replace(/[^a-z0-9]/gi, '_');
       return `<tr>
         <td><div style="font-size:0.85rem;font-weight:600;color:#0f172a">${esc(u.name)}</div><div style="font-size:0.72rem;color:#94a3b8">${esc(u.email)}</div></td>
-        <td><span class="pill" style="${PLAN_COLORS[u.plan] || ''}">${(u.plan||'free').charAt(0).toUpperCase()+(u.plan||'free').slice(1)}</span></td>
+        <td><span class="pill" style="${PLAN_COLORS[u.plan] || ''}">${planName}</span>${trialBadge}</td>
         <td>
           <div style="display:flex;align-items:center;gap:8px;min-width:120px">
             <div style="flex:1;background:#f1f5f9;border-radius:4px;height:6px;overflow:hidden">
               <div style="width:${pct}%;background:${color};height:100%;border-radius:4px"></div>
             </div>
-            <span style="font-size:0.72rem;color:${color};font-weight:700;white-space:nowrap">${u.used}/${u.limit}</span>
+            <span style="font-size:0.72rem;color:${color};font-weight:700;white-space:nowrap">${u.used}/${u.limit}${periodLabel}</span>
           </div>
         </td>
         <td>
-          <select onchange="setPlan('${esc(u.email)}', this.value, this)" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:0.78rem;cursor:pointer">
-            ${enabledPlans.includes('free')   ? `<option value="free"   ${u.plan==='free'  ?'selected':''}>Free (25)</option>`   : ''}
-            ${enabledPlans.includes('growth') ? `<option value="growth" ${u.plan==='growth'?'selected':''}>Growth (50)</option>` : ''}
-            ${enabledPlans.includes('pro')    ? `<option value="pro"    ${u.plan==='pro'   ?'selected':''}>Pro (100)</option>`   : ''}
-          </select>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <select id="plan-sel-${emailKey}" onchange="onPlanSelectChange('${esc(u.email)}','${emailKey}')" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:0.78rem;cursor:pointer">
+              ${enabledPlans.includes('free')    ? `<option value="free"    ${u.plan==='free'   ?'selected':''}>Free (25/wk trial)</option>`  : ''}
+              ${enabledPlans.includes('starter') ? `<option value="starter" ${u.plan==='starter'?'selected':''}>Starter (50/mo)</option>`      : ''}
+              ${enabledPlans.includes('growth')  ? `<option value="growth"  ${u.plan==='growth' ?'selected':''}>Growth (100/mo)</option>`      : ''}
+              ${enabledPlans.includes('pro')     ? `<option value="pro"     ${u.plan==='pro'    ?'selected':''}>Pro (custom/mo)</option>`      : ''}
+            </select>
+            <input type="number" id="pro-limit-${emailKey}" placeholder="limit" min="1"
+              style="display:${u.plan==='pro'?'inline-block':'none'};width:72px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:0.78rem"
+              value="${u.pro_limit||''}">
+            <button onclick="setPlan('${esc(u.email)}','${emailKey}')" style="background:#4f6af6;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:0.78rem;cursor:pointer;font-weight:600">Set</button>
+          </div>
         </td>
       </tr>`;
     }).join('');
   }
 
-  async function setPlan(email, plan, sel) {
+  function onPlanSelectChange(email, key) {
+    const sel = document.getElementById(`plan-sel-${key}`);
+    const li  = document.getElementById(`pro-limit-${key}`);
+    if (li) li.style.display = sel.value === 'pro' ? 'inline-block' : 'none';
+  }
+
+  async function setPlan(email, key) {
+    const sel   = document.getElementById(`plan-sel-${key}`);
+    const plan  = sel.value;
+    const body  = { plan };
+    if (plan === 'pro') {
+      const li = document.getElementById(`pro-limit-${key}`);
+      const v  = parseInt(li?.value);
+      if (!v || v < 1) { alert('Enter a valid custom profile limit for Pro plan.'); return; }
+      body.pro_limit = v;
+    }
     const res = await fetch(`/api/admin/users/${encodeURIComponent(email)}/plan`, {
       method: 'PUT', headers: { 'X-Admin-Secret': adminSecret, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan })
+      body: JSON.stringify(body)
     });
     if (res.ok) { sel.style.borderColor = '#10b981'; setTimeout(() => sel.style.borderColor = '', 1500); loadAll(); }
   }

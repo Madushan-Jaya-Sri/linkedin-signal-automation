@@ -227,23 +227,33 @@ async def admin_get_searches(request: Request):
 
 @app.get("/api/admin/usage")
 async def admin_get_usage(request: Request):
-    """Admin views monthly analyzed profiles per user vs plan limit."""
+    """Admin views usage per user vs plan limit, including trial status."""
     require_admin(request)
     if db is None:
         raise HTTPException(status_code=503, detail="Database not configured")
-    users = list(db.users.find({}, {"_id": 0, "email": 1, "name": 1, "plan": 1}))
+    users = list(db.users.find({}, {"_id": 0, "email": 1, "name": 1, "plan": 1, "created_at": 1, "pro_limit": 1}))
     result = []
     for u in users:
-        plan  = u.get("plan", DEFAULT_PLAN)
-        limit = get_plan_limit(plan)
-        used  = get_monthly_analyzed(u["email"])
+        plan          = u.get("plan", DEFAULT_PLAN)
+        limit         = get_user_effective_limit(u["email"], plan)
+        used          = get_period_analyzed(u["email"], plan)
+        trial_expired = check_trial_expired(u["email"], plan)
+        trial_expires_at = None
+        if plan == "free":
+            created_at = u.get("created_at")
+            if created_at:
+                trial_expires_at = (created_at + timedelta(days=TRIAL_DAYS)).isoformat()
         result.append({
-            "email":     u["email"],
-            "name":      u.get("name", ""),
-            "plan":      plan,
-            "used":      used,
-            "limit":     limit,
-            "remaining": max(0, limit - used),
+            "email":           u["email"],
+            "name":            u.get("name", ""),
+            "plan":            plan,
+            "pro_limit":       u.get("pro_limit"),
+            "used":            used,
+            "limit":           limit,
+            "remaining":       max(0, limit - used),
+            "period":          get_plan_period(plan),
+            "trial_expired":   trial_expired,
+            "trial_expires_at": trial_expires_at,
         })
     result.sort(key=lambda x: x["used"], reverse=True)
     return result
@@ -255,7 +265,7 @@ async def admin_get_settings(request: Request):
     require_admin(request)
     return {
         "max_posts":     get_setting("max_posts",  10),
-        "enabled_plans": get_setting("enabled_plans", ["free", "growth", "pro"]),
+        "enabled_plans": get_setting("enabled_plans", ["free", "starter", "growth", "pro"]),
     }
 
 
@@ -287,10 +297,16 @@ async def admin_set_user_plan(email: str, request: Request):
     plan = body.get("plan", DEFAULT_PLAN)
     if plan not in PLAN_LIMITS:
         raise HTTPException(status_code=400, detail=f"Invalid plan. Choose: {list(PLAN_LIMITS.keys())}")
-    enabled = get_setting("enabled_plans", ["growth"])
+    enabled = get_setting("enabled_plans", ["free", "starter", "growth", "pro"])
     if plan not in enabled:
         raise HTTPException(status_code=400, detail=f"Plan '{plan}' is currently disabled.")
-    db.users.update_one({"email": email.lower()}, {"$set": {"plan": plan}})
+    update: dict = {"plan": plan}
+    if plan == "pro":
+        pro_limit = body.get("pro_limit")
+        if not pro_limit:
+            raise HTTPException(status_code=400, detail="pro_limit is required for Pro plan.")
+        update["pro_limit"] = int(pro_limit)
+    db.users.update_one({"email": email.lower()}, {"$set": update})
     return {"ok": True}
 
 
@@ -612,17 +628,20 @@ async def start_search(request: Request, user: dict = Depends(get_current_user))
     if not search_query:
         raise HTTPException(status_code=400, detail="searchQuery is required")
 
-    # ── Monthly usage limit check (plan-based) ─────────────────
-    plan  = get_user_plan(user["email"])
-    limit = get_plan_limit(plan)
-    used  = get_monthly_analyzed(user["email"])
+    # ── Plan / trial checks ────────────────────────────────────
+    plan = get_user_plan(user["email"])
+    if check_trial_expired(user["email"], plan):
+        raise HTTPException(status_code=403, detail="Your free trial has expired. Please upgrade to continue.")
+    limit  = get_user_effective_limit(user["email"], plan)
+    used   = get_period_analyzed(user["email"], plan)
+    period = get_plan_period(plan)
     if used >= limit:
         raise HTTPException(
             status_code=429,
-            detail=f"Monthly limit reached ({used}/{limit}) on your {plan.title()} plan. Upgrade or wait for next month."
+            detail=f"{'Weekly' if period == 'week' else 'Monthly'} limit reached ({used}/{limit}) on your {plan.title()} plan. Upgrade or wait for the next {period}."
         )
 
-    # Cap maxItems by the user's plan limit
+    # Cap Apify results to the user's plan allowance
     params["maxItems"] = limit
 
     job_id = str(uuid.uuid4())[:8]
@@ -660,8 +679,13 @@ async def get_progress(job_id: str):
 
 
 # ─── Plan System ───────────────────────────────────────────────
-PLAN_LIMITS = {"free": 25, "growth": 50, "pro": 100}
-DEFAULT_PLAN = "free"
+# free  = 25 profiles/week, 7-day trial then must upgrade
+# starter = 50 profiles/month
+# growth  = 100 profiles/month
+# pro     = custom limit/month (set per user by admin)
+PLAN_LIMITS   = {"free": 25, "starter": 50, "growth": 100, "pro": None}
+DEFAULT_PLAN  = "free"
+TRIAL_DAYS    = 7
 
 
 def get_setting(key: str, default):
@@ -679,8 +703,29 @@ def get_user_plan(email: str) -> str:
     return (u or {}).get("plan", DEFAULT_PLAN)
 
 
-def get_plan_limit(plan: str) -> int:
+def get_user_effective_limit(email: str, plan: str) -> int:
+    """Return the profile limit for the user. Pro reads a per-user custom value."""
+    if plan == "pro":
+        if db is None:
+            return 100
+        u = db.users.find_one({"email": email}, {"pro_limit": 1})
+        return int((u or {}).get("pro_limit", 100))
     return PLAN_LIMITS.get(plan, PLAN_LIMITS[DEFAULT_PLAN])
+
+
+def get_plan_period(plan: str) -> str:
+    return "week" if plan == "free" else "month"
+
+
+def check_trial_expired(email: str, plan: str) -> bool:
+    """Returns True when a free-plan user's 7-day trial window has closed."""
+    if plan != "free" or db is None:
+        return False
+    u = db.users.find_one({"email": email}, {"created_at": 1})
+    created_at = (u or {}).get("created_at")
+    if not created_at:
+        return False
+    return (datetime.utcnow() - created_at).total_seconds() > TRIAL_DAYS * 86400
 
 
 def get_monthly_analyzed(email: str) -> int:
@@ -697,38 +742,70 @@ def get_monthly_analyzed(email: str) -> int:
     return row["total"] if row else 0
 
 
+def get_weekly_analyzed(email: str) -> int:
+    """Sum analyzed_count over a rolling 7-day window."""
+    if db is None:
+        return 0
+    week_start = datetime.utcnow() - timedelta(days=7)
+    result = db.cycles.aggregate([
+        {"$match": {"user_email": email, "completed_at": {"$gte": week_start}}},
+        {"$group": {"_id": None, "total": {"$sum": "$analyzed_count"}}}
+    ])
+    row = next(result, None)
+    return row["total"] if row else 0
+
+
+def get_period_analyzed(email: str, plan: str) -> int:
+    return get_weekly_analyzed(email) if plan == "free" else get_monthly_analyzed(email)
+
+
 @app.get("/api/usage")
 async def get_usage(user: dict = Depends(get_current_user)):
-    """Return current user's monthly usage, plan and limit."""
-    plan  = get_user_plan(user["email"])
-    limit = get_plan_limit(plan)
-    used  = get_monthly_analyzed(user["email"])
+    """Return current user's usage, plan, limit, and trial info."""
+    plan          = get_user_plan(user["email"])
+    limit         = get_user_effective_limit(user["email"], plan)
+    used          = get_period_analyzed(user["email"], plan)
+    period        = get_plan_period(plan)
+    trial_expired = check_trial_expired(user["email"], plan)
+    trial_days_left = None
+    if plan == "free" and not trial_expired and db is not None:
+        u = db.users.find_one({"email": user["email"]}, {"created_at": 1})
+        created_at = (u or {}).get("created_at")
+        if created_at:
+            secs_left = TRIAL_DAYS * 86400 - (datetime.utcnow() - created_at).total_seconds()
+            trial_days_left = max(0, int(secs_left / 86400))
     return {
-        "used":      used,
-        "limit":     limit,
-        "remaining": max(0, limit - used),
-        "plan":      plan,
+        "used":            used,
+        "limit":           limit,
+        "remaining":       max(0, limit - used),
+        "plan":            plan,
+        "period":          period,
+        "trial_expired":   trial_expired,
+        "trial_days_left": trial_days_left,
     }
 
 
 @app.get("/api/profile")
 async def get_profile(user: dict = Depends(get_current_user)):
-    """Return current user's profile info, plan and monthly usage."""
+    """Return current user's profile info, plan, usage, and trial info."""
     if db is None:
         raise HTTPException(status_code=503, detail="Database not configured")
-    u = db.users.find_one({"email": user["email"]}, {"_id": 0, "name": 1, "email": 1, "plan": 1, "created_at": 1})
+    u = db.users.find_one({"email": user["email"]}, {"_id": 0, "name": 1, "email": 1, "plan": 1, "created_at": 1, "pro_limit": 1})
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
-    plan  = u.get("plan", DEFAULT_PLAN)
-    limit = get_plan_limit(plan)
-    used  = get_monthly_analyzed(user["email"])
+    plan          = u.get("plan", DEFAULT_PLAN)
+    limit         = get_user_effective_limit(user["email"], plan)
+    used          = get_period_analyzed(user["email"], plan)
+    trial_expired = check_trial_expired(user["email"], plan)
     return {
-        "name":      u["name"],
-        "email":     u["email"],
-        "plan":      plan,
-        "used":      used,
-        "limit":     limit,
-        "remaining": max(0, limit - used),
+        "name":          u["name"],
+        "email":         u["email"],
+        "plan":          plan,
+        "used":          used,
+        "limit":         limit,
+        "remaining":     max(0, limit - used),
+        "period":        get_plan_period(plan),
+        "trial_expired": trial_expired,
     }
 
 
@@ -745,15 +822,18 @@ async def select_profiles(job_id: str, request: Request, user: dict = Depends(ge
     if job["phase"] not in ("awaiting_selection", "complete"):
         raise HTTPException(status_code=400, detail=f"Cannot start Phase 2 — job is in '{job['phase']}' phase")
 
-    # ── Usage limit check (monthly, plan-based) ────────────────
-    plan      = get_user_plan(user["email"])
-    limit     = get_plan_limit(plan)
-    used      = get_monthly_analyzed(user["email"])
+    # ── Plan / trial checks ────────────────────────────────────
+    plan = get_user_plan(user["email"])
+    if check_trial_expired(user["email"], plan):
+        raise HTTPException(status_code=403, detail="Your free trial has expired. Please upgrade to continue.")
+    limit     = get_user_effective_limit(user["email"], plan)
+    used      = get_period_analyzed(user["email"], plan)
+    period    = get_plan_period(plan)
     remaining = max(0, limit - used)
     if remaining == 0:
         raise HTTPException(
             status_code=429,
-            detail=f"Monthly limit reached ({used}/{limit}) on your {plan.title()} plan. Upgrade or wait for next month."
+            detail=f"{'Weekly' if period == 'week' else 'Monthly'} limit reached ({used}/{limit}) on your {plan.title()} plan. Upgrade or wait for the next {period}."
         )
 
     body = await request.json()

@@ -682,7 +682,8 @@ def get_user_plan(email: str) -> str:
 
 
 def get_plan_limit(plan: str) -> int:
-    return PLAN_LIMITS.get(plan, PLAN_LIMITS[DEFAULT_PLAN])
+    base = PLAN_LIMITS.get(plan, PLAN_LIMITS[DEFAULT_PLAN])
+    return get_setting("max_items", base)
 
 
 def get_monthly_analyzed(email: str) -> int:

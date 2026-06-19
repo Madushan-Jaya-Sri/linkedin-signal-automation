@@ -206,7 +206,6 @@ def scrape_profiles_advanced(params: dict, progress_callback=None) -> list[dict]
 
     run = client.actor(ACTOR_PROFILE_SEARCH).call(
         run_input=run_input,
-        timeout_secs=600,
     )
 
     print("[INFO] Actor run complete — downloading dataset results...")
@@ -314,7 +313,6 @@ def scrape_posts(linkedin_url: str, max_posts: int = 20) -> list[dict]:
 
     run = client.actor(ACTOR_USER_POSTS).call(
         run_input=run_input,
-        timeout_secs=120,
     )
 
     posts = []

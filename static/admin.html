@@ -281,6 +281,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .copy-btn:hover { background: #f0f4ff; border-color: #c7d2fe; color: #6366f1; }
 .drawer-empty { padding: 48px; text-align: center; color: #94a3b8; font-size: 0.85rem; }
 .drawer-loading { padding: 48px; text-align: center; color: #94a3b8; font-size: 0.85rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -1432,7 +1433,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
             <input type="number" id="pro-limit-${emailKey}" placeholder="limit" min="1"
               style="display:${u.plan==='pro'?'inline-block':'none'};width:72px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:0.78rem"
               value="${u.pro_limit||''}">
-            <button onclick="setPlan('${esc(u.email)}','${emailKey}')" style="background:#4f6af6;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:0.78rem;cursor:pointer;font-weight:600">Set</button>
+            <button onclick="setPlan('${esc(u.email)}','${emailKey}',this)" style="background:#4f6af6;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:0.78rem;cursor:pointer;font-weight:600">Set</button>
           </div>
         </td>
       </tr>`;
@@ -1445,21 +1446,32 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     if (li) li.style.display = sel.value === 'pro' ? 'inline-block' : 'none';
   }
 
-  async function setPlan(email, key) {
-    const sel   = document.getElementById(`plan-sel-${key}`);
-    const plan  = sel.value;
-    const body  = { plan };
+  async function setPlan(email, key, btn) {
+    const sel  = document.getElementById(`plan-sel-${key}`);
+    const plan = sel.value;
+    const body = { plan };
     if (plan === 'pro') {
       const li = document.getElementById(`pro-limit-${key}`);
       const v  = parseInt(li?.value);
       if (!v || v < 1) { alert('Enter a valid custom profile limit for Pro plan.'); return; }
       body.pro_limit = v;
     }
+    btn.disabled = true;
+    btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:spin 0.7s linear infinite"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>Saving…</span>';
     const res = await fetch(`/api/admin/users/${encodeURIComponent(email)}/plan`, {
       method: 'PUT', headers: { 'X-Admin-Secret': adminSecret, 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    if (res.ok) { sel.style.borderColor = '#10b981'; setTimeout(() => sel.style.borderColor = '', 1500); loadPlanTable(); }
+    if (res.ok) {
+      btn.innerHTML = '✓ Done';
+      btn.style.background = '#10b981';
+      setTimeout(() => loadPlanTable(), 800);
+    } else {
+      btn.innerHTML = 'Set';
+      btn.disabled = false;
+      btn.style.background = '#ef4444';
+      setTimeout(() => { btn.style.background = '#4f6af6'; }, 1500);
+    }
   }
 
   // ── INIT ──────────────────────────────────────────

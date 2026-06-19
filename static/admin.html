@@ -1459,7 +1459,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       method: 'PUT', headers: { 'X-Admin-Secret': adminSecret, 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    if (res.ok) { sel.style.borderColor = '#10b981'; setTimeout(() => sel.style.borderColor = '', 1500); loadAll(); }
+    if (res.ok) { sel.style.borderColor = '#10b981'; setTimeout(() => sel.style.borderColor = '', 1500); loadPlanTable(); }
   }
 
   // ── INIT ──────────────────────────────────────────

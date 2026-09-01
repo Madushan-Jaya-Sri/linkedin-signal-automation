@@ -5,7 +5,7 @@ from apify_client import ApifyClient
 APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN")
 
 ACTOR_PROFILE_SEARCH = "M2FMdjRVeF1HPGFcc"
-ACTOR_USER_POSTS = "vyWtXDqJ3xKyA5ayO"
+ACTOR_USER_POSTS = "RE0MriXnFhR3IgVnJ"
 
 
 def get_client() -> ApifyClient:
@@ -303,17 +303,9 @@ def scrape_posts(linkedin_url: str, max_posts: int = 20) -> list[dict]:
     """Scrape LinkedIn posts for a single user profile."""
     client = get_client()
 
-    # Extract username or use full URL
-    profile_input = linkedin_url
-    if "/in/" in linkedin_url:
-        # Extract just the username part for cleaner input
-        parts = linkedin_url.rstrip("/").split("/in/")
-        if len(parts) > 1:
-            profile_input = parts[1].split("/")[0].split("?")[0]
-
     run_input = {
-        "profile": profile_input,
-        "maxPosts": max_posts,
+        "profiles": [linkedin_url],
+        "max_posts": max_posts,
     }
 
     print(f"[INFO] Scraping posts for: {linkedin_url}")

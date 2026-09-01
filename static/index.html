@@ -978,10 +978,10 @@
 
     // Reset UI: hide results/pipeline, show search form
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-    document.getElementById('pipeline').style.display = 'none';
-    document.getElementById('resultsSection').style.display = 'none';
+    document.getElementById('pipeline').classList.remove('visible');
+    document.getElementById('resultsSection').classList.remove('visible');
     const ss = document.getElementById('selectionSection');
-    if (ss) ss.style.display = 'none';
+    if (ss) ss.classList.remove('visible');
     const fds = document.getElementById('floatingDeepSearch');
     if (fds) fds.classList.remove('visible');
 

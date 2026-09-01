@@ -883,6 +883,13 @@ async def select_profiles(job_id: str, request: Request, user: dict = Depends(ge
         job["analyzed_profiles"] = []
         job["analyzed_count"] = 0
 
+    # Flip the phase synchronously, before returning, so a poll that lands before
+    # the background thread runs never reads a stale "complete" (with the
+    # analyzed_profiles we just cleared above) and short-circuits the UI.
+    job["phase"] = "scraping_posts"
+    job["posts_total"] = len(selected_urls)
+    job["posts_scraped"] = 0
+
     thread = threading.Thread(target=_run_phase2, args=(job_id, selected_urls), daemon=True)
     thread.start()
 

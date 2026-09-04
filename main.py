@@ -21,7 +21,7 @@ import bcrypt as _bcrypt
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
-from apify_client_wrapper import scrape_profiles_advanced, scrape_posts, filter_profiles
+from apify_client_wrapper import scrape_profiles_advanced, scrape_posts, filter_profiles, _parse_profile
 from scorer import analyze_profile, chat_with_profile, detect_linkedin_url_column, draft_outreach_email
 
 app = FastAPI(title="LinkedIn Lead Intelligence")
@@ -900,19 +900,22 @@ async def select_profiles(job_id: str, request: Request, user: dict = Depends(ge
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
+def _name_from_url(url: str) -> str:
+    slug = url
+    if "/in/" in url:
+        slug = url.rstrip("/").split("/in/")[-1].split("?")[0]
+    words = [w for w in re.split(r"[-_]+", slug) if w and not w.isdigit()]
+    return " ".join(w.capitalize() for w in words) or "LinkedIn Profile"
+
+
 def _stub_profile_from_url(url: str, email: str = "") -> dict:
     """Build a minimal profile dict for a LinkedIn URL with no scraped data yet.
 
     Mirrors the shape apify_client_wrapper._parse_profile produces so the
     selection UI and Phase 2 pipeline can treat it the same as a searched profile.
     """
-    slug = url
-    if "/in/" in url:
-        slug = url.rstrip("/").split("/in/")[-1].split("?")[0]
-    words = [w for w in re.split(r"[-_]+", slug) if w and not w.isdigit()]
-    name = " ".join(w.capitalize() for w in words) or "LinkedIn Profile"
     return {
-        "first_name": "", "last_name": "", "name": name,
+        "first_name": "", "last_name": "", "name": _name_from_url(url),
         "headline": "", "job_title": "", "company": "", "company_url": "",
         "about": "", "skills": "", "linkedin_url": url, "email": email,
         "country": "", "city": "", "location_text": "",
@@ -920,6 +923,44 @@ def _stub_profile_from_url(url: str, email: str = "") -> dict:
         "is_hiring": False, "is_open_to_work": False, "is_premium": False,
         "photo": "", "experience_summary": "", "education_summary": "", "certifications_summary": "",
     }
+
+
+def _unflatten_csv_row(row: dict) -> dict:
+    """Rebuild a nested profile dict from a flattened CSV row (e.g. keys like
+    "currentPosition/0/companyName" or "skills/0/name"), so it can be fed
+    through apify_client_wrapper._parse_profile exactly like a live-scraped
+    profile. Columns that don't match this pattern are simply ignored —
+    _parse_profile only reads the specific keys it needs.
+    """
+    root: dict = {}
+    for key, value in row.items():
+        if not value:
+            continue
+        node = root
+        parts = key.split("/")
+        for i, part in enumerate(parts):
+            is_last = i == len(parts) - 1
+            if part.isdigit():
+                if not isinstance(node, list):
+                    break
+                idx = int(part)
+                while len(node) <= idx:
+                    node.append({})
+                if is_last:
+                    node[idx] = value
+                else:
+                    if not isinstance(node[idx], (dict, list)):
+                        node[idx] = {}
+                    node = node[idx]
+            else:
+                if is_last:
+                    node[part] = value
+                else:
+                    default = [] if parts[i + 1].isdigit() else {}
+                    if not isinstance(node.get(part), (dict, list)):
+                        node[part] = default
+                    node = node[part]
+    return root
 
 
 def _detect_email_column(fieldnames: list[str], rows: list[dict]) -> str | None:
@@ -1003,7 +1044,21 @@ def _extract_leads_from_csv(csv_text: str) -> tuple[list[dict], int]:
         email = (row.get(email_column) or "").strip() if email_column else ""
         if not EMAIL_RE.match(email):
             email = ""
-        new_profiles.append(_stub_profile_from_url(url, email))
+
+        # Best-effort enrichment: if the row has Apify-shaped nested columns
+        # (currentPosition/0/companyName, skills/0/name, etc.) this fills in
+        # headline/company/skills/experience/education for free; otherwise
+        # falls back to the bare stub below.
+        try:
+            profile = _parse_profile(_unflatten_csv_row(row))
+        except Exception:
+            profile = _stub_profile_from_url(url)
+        profile["linkedin_url"] = url
+        profile["email"] = email
+        if not profile.get("name", "").strip():
+            profile["name"] = _name_from_url(url)
+
+        new_profiles.append(profile)
 
     if not new_profiles:
         raise HTTPException(status_code=400, detail="No new LinkedIn profile URLs found in that CSV.")

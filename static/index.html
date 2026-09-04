@@ -554,6 +554,8 @@
     </div>
 
     <div class="form-actions">
+      <button class="btn-secondary" id="uploadLeadsBtn" onclick="triggerCsvUpload()" title="Upload a CSV of LinkedIn URLs and skip straight to selecting profiles">&#128228; Upload Leads</button>
+      <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="onCsvFileSelected(event)">
       <button class="btn-primary" id="searchBtn" onclick="startSearch()">Search</button>
       <button class="btn-secondary" id="clearBtn" onclick="clearAndSearchAgain()" style="display:none;margin-left:10px;background:#f8f9fa;color:#636e72;border:1px solid #e0e3ea;padding:10px 20px;border-radius:8px;font-size:0.9rem;font-weight:600;cursor:pointer" title="Clear fields and start a new search">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;vertical-align:-1px"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
@@ -606,8 +608,6 @@
         <button class="btn-secondary btn-sm" onclick="toggleSelectAll()">Select All</button>
         <button class="btn-secondary btn-sm" onclick="exportCSV('with-email')">Export With Email</button>
         <button class="btn-secondary btn-sm" onclick="exportCSV('without-email')">Export Without Email</button>
-        <button class="btn-secondary btn-sm" id="uploadLeadsBtn" onclick="triggerCsvUpload()" title="Upload a CSV of LinkedIn URLs to add to this list">&#128228; Upload Leads</button>
-        <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="onCsvFileSelected(event)">
       </div>
     </div>
 
@@ -1100,7 +1100,8 @@
   let currentJobPhase = ''; // Track current job state
   let selectionData = {with_email: [], without_email: []}; // populated at awaiting_selection
   let currentPlan = null; // set by loadUsage(); gates paid-only features like CSV upload
-  let csvModalRows = []; // [{url, name}] parsed from the last CSV upload, pending confirmation
+  let csvModalRows = []; // profile stubs parsed from the last CSV upload, pending confirmation
+  let pendingCsvJobId = null; // job created by the CSV upload, adopted as `jobId` on confirm
 
   // ─── PIPELINE STEP NAVIGATION ────────────────────────────
   function onStepClick(step) {
@@ -1343,7 +1344,7 @@
     updateSelectedCount();
   }
 
-  // ─── CSV LEAD UPLOAD ──────────────────────────────────────
+  // ─── CSV LEAD UPLOAD (skips search — goes straight to selection) ──
   function applyUploadLeadsGate() {
     const btn = document.getElementById('uploadLeadsBtn');
     if (!btn) return;
@@ -1352,17 +1353,13 @@
       btn.title = 'Upgrade your plan to upload a leads list';
     } else {
       btn.classList.remove('locked');
-      btn.title = 'Upload a CSV of LinkedIn URLs to add to this list';
+      btn.title = 'Upload a CSV of LinkedIn URLs and skip straight to selecting profiles';
     }
   }
 
   function triggerCsvUpload() {
     if (currentPlan === 'free') {
       showError('Uploading a leads list is available on paid plans. Please upgrade to use this feature.');
-      return;
-    }
-    if (!jobId) {
-      showError('Start a search first, then upload leads to add to that list.');
       return;
     }
     document.getElementById('csvFileInput').value = '';
@@ -1374,13 +1371,14 @@
     if (!file) return;
 
     const btn = document.getElementById('uploadLeadsBtn');
-    const origText = btn.textContent;
+    const origHtml = btn.innerHTML;
     btn.disabled = true; btn.textContent = 'Uploading...';
 
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await authFetch(`/api/search/${jobId}/upload-csv`, {
+      formData.append('search_query', document.getElementById('searchQuery').value.trim());
+      const res = await authFetch('/api/search/upload-csv', {
         method: 'POST',
         body: formData,
       });
@@ -1388,16 +1386,12 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to upload CSV');
 
-      // Keep selectionData's without-email list in sync with the server
-      selectionData.with_email = data.profiles_with_email || selectionData.with_email;
-      selectionData.without_email = data.profiles_without_email || selectionData.without_email;
-      try { localStorage.setItem('leadIntelSelectionData', JSON.stringify(selectionData)); } catch(e) {}
-
+      pendingCsvJobId = data.job_id;
       openCsvModal(data.profiles, data.skipped);
     } catch (e) {
       showError(e.message || 'Failed to upload CSV.');
     } finally {
-      btn.disabled = false; btn.textContent = origText;
+      btn.disabled = false; btn.innerHTML = origHtml;
     }
   }
 
@@ -1406,7 +1400,7 @@
     const sub = document.getElementById('csvModalSub');
     sub.textContent = skipped
       ? `Found ${csvModalRows.length} LinkedIn URL(s) — ${skipped} row(s) skipped (no valid LinkedIn URL).`
-      : `Found ${csvModalRows.length} LinkedIn URL(s). Uncheck any you don't want to add.`;
+      : `Found ${csvModalRows.length} LinkedIn URL(s). Uncheck any you don't want to include, then continue.`;
 
     const body = document.getElementById('csvModalBody');
     if (!csvModalRows.length) {
@@ -1443,26 +1437,38 @@
   }
 
   function confirmCsvSelection() {
-    const checkedUrls = new Set();
-    document.querySelectorAll('#csvModalBody input[type="checkbox"]:checked').forEach((cb, idx) => {
+    const checkedProfiles = [];
+    document.querySelectorAll('#csvModalBody input[type="checkbox"]:checked').forEach(cb => {
       const i = parseInt(cb.id.replace('csvRow_', ''), 10);
-      if (csvModalRows[i]) checkedUrls.add(csvModalRows[i].linkedin_url);
+      if (csvModalRows[i]) checkedProfiles.push(csvModalRows[i]);
     });
 
     closeCsvModal();
+    if (!checkedProfiles.length || !pendingCsvJobId) { pendingCsvJobId = null; return; }
 
-    if (!checkedUrls.size) return;
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    jobId = pendingCsvJobId;
+    pendingCsvJobId = null;
 
-    // Re-render the main selection list (it already has all uploaded profiles
-    // from the server response) and check the ones confirmed in the modal.
+    selectionData = {with_email: [], without_email: checkedProfiles};
+    try { localStorage.setItem('leadIntelSelectionData', JSON.stringify(selectionData)); } catch(e) {}
+    localStorage.setItem('leadIntelJobId', jobId);
+    const q = document.getElementById('searchQuery').value.trim();
+    if (q) localStorage.setItem('leadIntelSearchQuery', q);
+
+    // Jump straight to the "profiles found" pipeline stage — no search was run.
+    hideStatus();
+    document.getElementById('errorMsg').classList.remove('visible');
+    document.getElementById('resultsSection').classList.remove('visible');
+    document.getElementById('scoringStage').classList.remove('visible');
+    document.getElementById('pipeline').classList.add('visible');
+    setPipeline(3);
+    lastPhase = '';
+
     renderSelection(selectionData.with_email, selectionData.without_email);
-    checkedUrls.forEach(url => {
-      const box = document.querySelector(`#selectionSection input[data-url="${CSS.escape(url)}"]`);
-      if (box) box.checked = true;
-    });
-    updateSelectedCount();
 
-    document.getElementById('selectionSection').classList.add('visible');
+    document.getElementById('searchBtn').style.display = 'none';
+    document.getElementById('clearBtn').style.display = '';
     document.getElementById('floatingDeepSearch').classList.add('visible');
     document.getElementById('selectionSection').scrollIntoView({behavior: 'smooth', block: 'start'});
   }

@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -919,33 +919,22 @@ def _stub_profile_from_url(url: str) -> dict:
     }
 
 
-@app.post("/api/search/{job_id}/upload-csv")
-async def upload_leads_csv(job_id: str, file: UploadFile = File(...), user: dict = Depends(get_current_user)):
-    """Upload a CSV of LinkedIn URLs and add them to this job's selectable profiles.
-
-    Paid plans only. Auto-detects the URL column by header name (anything
-    containing "url", e.g. "URL", "LinkedIn URL", "Profile Url").
-    """
-    job = jobs.get(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    if job["phase"] not in ("awaiting_selection", "complete"):
-        raise HTTPException(status_code=400, detail=f"Cannot upload leads — job is in '{job['phase']}' phase")
-
-    plan = get_user_plan(user["email"])
-    if plan == "free":
-        raise HTTPException(status_code=403, detail="Uploading a leads list is available on paid plans. Please upgrade to use this feature.")
-
+async def _read_csv_text(file: UploadFile) -> str:
     if not (file.filename or "").lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Please upload a .csv file")
-
     raw = await file.read()
     try:
-        text = raw.decode("utf-8-sig")
+        return raw.decode("utf-8-sig")
     except UnicodeDecodeError:
-        text = raw.decode("latin-1")
+        return raw.decode("latin-1")
 
-    reader = csv.DictReader(io.StringIO(text))
+
+def _extract_leads_from_csv(csv_text: str) -> tuple[list[dict], int]:
+    """Parse a CSV's rows into profile stubs, auto-detecting the URL column
+    by header name (anything containing "url", e.g. "URL", "LinkedIn URL",
+    "Profile Url"). Returns (new_profiles, skipped_count).
+    """
+    reader = csv.DictReader(io.StringIO(csv_text))
     if not reader.fieldnames:
         raise HTTPException(status_code=400, detail="CSV appears to be empty")
 
@@ -961,7 +950,6 @@ async def upload_leads_csv(job_id: str, file: UploadFile = File(...), user: dict
             detail="Couldn't find a URL column in that CSV. Expected a header like 'URL', 'LinkedIn URL', or 'Profile URL'.",
         )
 
-    existing_urls = {p["linkedin_url"] for p in job["profiles_with_email"] + job["profiles_without_email"]}
     new_profiles = []
     seen = set()
     skipped = 0
@@ -972,7 +960,7 @@ async def upload_leads_csv(job_id: str, file: UploadFile = File(...), user: dict
         if "linkedin.com" not in url.lower():
             skipped += 1
             continue
-        if url in existing_urls or url in seen:
+        if url in seen:
             continue
         seen.add(url)
         new_profiles.append(_stub_profile_from_url(url))
@@ -980,14 +968,56 @@ async def upload_leads_csv(job_id: str, file: UploadFile = File(...), user: dict
     if not new_profiles:
         raise HTTPException(status_code=400, detail="No new LinkedIn profile URLs found in that CSV.")
 
-    job["profiles_without_email"].extend(new_profiles)
+    return new_profiles, skipped
+
+
+@app.post("/api/search/upload-csv")
+async def upload_leads_csv(
+    file: UploadFile = File(...),
+    search_query: str = Form(""),
+    user: dict = Depends(get_current_user),
+):
+    """Upload a CSV of LinkedIn URLs and start a fresh selection from it — no
+    Apify search is run. Paid plans only.
+    """
+    import time
+    _cleanup_old_jobs()
+
+    plan = get_user_plan(user["email"])
+    if plan == "free":
+        raise HTTPException(status_code=403, detail="Uploading a leads list is available on paid plans. Please upgrade to use this feature.")
+
+    text = await _read_csv_text(file)
+    new_profiles, skipped = _extract_leads_from_csv(text)
+
+    job_id = str(uuid.uuid4())[:8]
+    query = search_query.strip()
+    jobs[job_id] = {
+        "phase": "awaiting_selection",
+        "created_at": time.time(),
+        "user_email": user["email"],
+        "search_query": query or "Uploaded leads list",
+        "search_params": {"searchQuery": query},
+        "profiles_found": len(new_profiles),
+        "profiles_filtered": len(new_profiles),
+        "profiles_with_email": [],
+        "profiles_without_email": new_profiles,
+        "posts_total": 0,
+        "posts_scraped": 0,
+        "analyzed_total": 0,
+        "analyzed_count": 0,
+        "analyzed_profiles": [],
+        "current_profile_name": "",
+        "error": "",
+    }
 
     return {
+        "job_id": job_id,
         "added": len(new_profiles),
         "skipped": skipped,
         "profiles": new_profiles,
-        "profiles_with_email": job["profiles_with_email"],
-        "profiles_without_email": job["profiles_without_email"],
+        "profiles_with_email": [],
+        "profiles_without_email": new_profiles,
     }
 
 

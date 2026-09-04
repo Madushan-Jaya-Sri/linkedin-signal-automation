@@ -22,7 +22,7 @@ from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
 from apify_client_wrapper import scrape_profiles_advanced, scrape_posts, filter_profiles
-from scorer import analyze_profile, chat_with_profile, draft_outreach_email
+from scorer import analyze_profile, chat_with_profile, detect_linkedin_url_column, draft_outreach_email
 
 app = FastAPI(title="LinkedIn Lead Intelligence")
 
@@ -932,23 +932,36 @@ async def _read_csv_text(file: UploadFile) -> str:
 def _extract_leads_from_csv(csv_text: str) -> tuple[list[dict], int]:
     """Parse a CSV's rows into profile stubs, auto-detecting the URL column
     by header name (anything containing "url", e.g. "URL", "LinkedIn URL",
-    "Profile Url"). Returns (new_profiles, skipped_count).
+    "Profile Url"). Falls back to an LLM column pick when header matching
+    is ambiguous. Returns (new_profiles, skipped_count).
     """
     reader = csv.DictReader(io.StringIO(csv_text))
     if not reader.fieldnames:
         raise HTTPException(status_code=400, detail="CSV appears to be empty")
+    rows = list(reader)
 
-    url_column = None
-    fallback_column = None
+    linkedin_url_matches = []
+    url_matches = []
     for col in reader.fieldnames:
         normalized = re.sub(r"[^a-z]", "", (col or "").lower())
-        if "linkedin" in normalized and "url" in normalized:
-            url_column = col
-            break
-        if "url" in normalized and fallback_column is None:
-            fallback_column = col
-    if not url_column:
-        url_column = fallback_column
+        if "url" not in normalized:
+            continue
+        url_matches.append(col)
+        if "linkedin" in normalized:
+            linkedin_url_matches.append(col)
+
+    if len(linkedin_url_matches) == 1:
+        url_column = linkedin_url_matches[0]
+    elif len(url_matches) == 1:
+        url_column = url_matches[0]
+    else:
+        # Ambiguous header match (0 or 2+ candidates) — let the LLM pick from
+        # the full column list and a couple of sample rows.
+        url_column = detect_linkedin_url_column(reader.fieldnames, rows[:2])
+        if not url_column:
+            candidates = linkedin_url_matches or url_matches
+            url_column = candidates[0] if candidates else None
+
     if not url_column:
         raise HTTPException(
             status_code=400,
@@ -958,7 +971,7 @@ def _extract_leads_from_csv(csv_text: str) -> tuple[list[dict], int]:
     new_profiles = []
     seen = set()
     skipped = 0
-    for row in reader:
+    for row in rows:
         url = (row.get(url_column) or "").strip()
         if not url:
             continue

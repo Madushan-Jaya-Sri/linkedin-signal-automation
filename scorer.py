@@ -285,3 +285,38 @@ Return ONLY valid JSON in this exact format:
         "body": result.get("body", ""),
         "to": profile.get("email", ""),
     }
+
+
+# ─── CSV Column Detection ───────────────────────────────────────
+
+def detect_linkedin_url_column(fieldnames: list[str], sample_rows: list[dict]) -> str | None:
+    """Ask the LLM which CSV column holds each row's LinkedIn profile URL.
+
+    Used only as a fallback when header-name matching can't confidently
+    pick one column (e.g. several columns contain "url").
+    """
+    client = OpenAI(api_key=OPENAI_API_KEY)
+
+    # Cap the sample so wide exports (hundreds of columns) stay cheap to send.
+    sample = json.dumps(sample_rows, ensure_ascii=False, default=str)[:4000]
+    prompt = (
+        "This is a CSV export from a lead-generation tool. Here are its column "
+        f"names and the first rows of data.\n\nColumns: {json.dumps(fieldnames)}\n\n"
+        f"Sample rows: {sample}\n\n"
+        "Which column holds each row's own LinkedIn PROFILE url (e.g. linkedin.com/in/...) "
+        "— not a company page, job posting, or search-results link? "
+        "Reply with ONLY the exact column name from the list, or NONE if no such column exists."
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            temperature=0,
+            max_tokens=30,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        answer = response.choices[0].message.content.strip().strip('`"\' ')
+    except Exception:
+        return None
+
+    return answer if answer in fieldnames else None

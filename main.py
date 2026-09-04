@@ -897,7 +897,10 @@ async def select_profiles(job_id: str, request: Request, user: dict = Depends(ge
     return {"status": "started", "selected_count": len(selected_urls)}
 
 
-def _stub_profile_from_url(url: str) -> dict:
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _stub_profile_from_url(url: str, email: str = "") -> dict:
     """Build a minimal profile dict for a LinkedIn URL with no scraped data yet.
 
     Mirrors the shape apify_client_wrapper._parse_profile produces so the
@@ -911,12 +914,26 @@ def _stub_profile_from_url(url: str) -> dict:
     return {
         "first_name": "", "last_name": "", "name": name,
         "headline": "", "job_title": "", "company": "", "company_url": "",
-        "about": "", "skills": "", "linkedin_url": url, "email": "",
+        "about": "", "skills": "", "linkedin_url": url, "email": email,
         "country": "", "city": "", "location_text": "",
         "connections": 0, "followers": 0,
         "is_hiring": False, "is_open_to_work": False, "is_premium": False,
         "photo": "", "experience_summary": "", "education_summary": "", "certifications_summary": "",
     }
+
+
+def _detect_email_column(fieldnames: list[str], rows: list[dict]) -> str | None:
+    """Find the column whose values look like email addresses, by content
+    rather than header name — headers for this vary too much to guess
+    reliably (e.g. "emails/0/email" vs "emails/0/status").
+    """
+    sample = rows[:50]
+    best_col, best_count = None, 0
+    for col in fieldnames:
+        count = sum(1 for row in sample if EMAIL_RE.match((row.get(col) or "").strip()))
+        if count > best_count:
+            best_col, best_count = col, count
+    return best_col
 
 
 async def _read_csv_text(file: UploadFile) -> str:
@@ -968,6 +985,8 @@ def _extract_leads_from_csv(csv_text: str) -> tuple[list[dict], int]:
             detail="Couldn't find a URL column in that CSV. Expected a header like 'URL', 'LinkedIn URL', or 'Profile URL'.",
         )
 
+    email_column = _detect_email_column(reader.fieldnames, rows)
+
     new_profiles = []
     seen = set()
     skipped = 0
@@ -981,7 +1000,10 @@ def _extract_leads_from_csv(csv_text: str) -> tuple[list[dict], int]:
         if url in seen:
             continue
         seen.add(url)
-        new_profiles.append(_stub_profile_from_url(url))
+        email = (row.get(email_column) or "").strip() if email_column else ""
+        if not EMAIL_RE.match(email):
+            email = ""
+        new_profiles.append(_stub_profile_from_url(url, email))
 
     if not new_profiles:
         raise HTTPException(status_code=400, detail="No new LinkedIn profile URLs found in that CSV.")
@@ -1007,6 +1029,8 @@ async def upload_leads_csv(
 
     text = await _read_csv_text(file)
     new_profiles, skipped = _extract_leads_from_csv(text)
+    with_email = [p for p in new_profiles if p.get("email")]
+    without_email = [p for p in new_profiles if not p.get("email")]
 
     job_id = str(uuid.uuid4())[:8]
     query = search_query.strip()
@@ -1018,8 +1042,8 @@ async def upload_leads_csv(
         "search_params": {"searchQuery": query},
         "profiles_found": len(new_profiles),
         "profiles_filtered": len(new_profiles),
-        "profiles_with_email": [],
-        "profiles_without_email": new_profiles,
+        "profiles_with_email": with_email,
+        "profiles_without_email": without_email,
         "posts_total": 0,
         "posts_scraped": 0,
         "analyzed_total": 0,
@@ -1034,8 +1058,8 @@ async def upload_leads_csv(
         "added": len(new_profiles),
         "skipped": skipped,
         "profiles": new_profiles,
-        "profiles_with_email": [],
-        "profiles_without_email": new_profiles,
+        "profiles_with_email": with_email,
+        "profiles_without_email": without_email,
     }
 
 

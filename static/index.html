@@ -329,7 +329,10 @@
   .csv-row input[type="checkbox"] { width: 16px; height: 16px; flex-shrink: 0; accent-color: #4f6af6; cursor: pointer; }
   .csv-row-name { font-size: 0.85rem; font-weight: 600; color: #2d3436; }
   .csv-row-url { font-size: 0.72rem; color: #b2bec3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .csv-row-email { font-size: 0.72rem; color: #00b894; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .csv-empty { text-align: center; padding: 40px 20px; color: #b2bec3; font-size: 0.85rem; }
+  .csv-group-label { margin: 14px 0 6px; }
+  .csv-group-label:first-child { margin-top: 0; }
   #uploadLeadsBtn.locked { opacity: 0.55; cursor: not-allowed; }
   #uploadLeadsBtn.locked::after { content: ' 🔒'; }
 
@@ -1100,7 +1103,8 @@
   let currentJobPhase = ''; // Track current job state
   let selectionData = {with_email: [], without_email: []}; // populated at awaiting_selection
   let currentPlan = null; // set by loadUsage(); gates paid-only features like CSV upload
-  let csvModalRows = []; // profile stubs parsed from the last CSV upload, pending confirmation
+  let csvModalRows = []; // profile stubs parsed from the last CSV upload (with-email first, then without), pending confirmation
+  let csvModalEmailCount = 0; // how many leading csvModalRows entries have an email
   let pendingCsvJobId = null; // job created by the CSV upload, adopted as `jobId` on confirm
 
   // ─── PIPELINE STEP NAVIGATION ────────────────────────────
@@ -1387,7 +1391,7 @@
       if (!res.ok) throw new Error(data.detail || 'Failed to upload CSV');
 
       pendingCsvJobId = data.job_id;
-      openCsvModal(data.profiles, data.skipped);
+      openCsvModal(data.profiles_with_email, data.profiles_without_email, data.skipped);
     } catch (e) {
       showError(e.message || 'Failed to upload CSV.');
     } finally {
@@ -1395,26 +1399,43 @@
     }
   }
 
-  function openCsvModal(profiles, skipped) {
-    csvModalRows = profiles || [];
+  function openCsvModal(withEmail, withoutEmail, skipped) {
+    withEmail = withEmail || [];
+    withoutEmail = withoutEmail || [];
+    csvModalRows = [...withEmail, ...withoutEmail];
+    csvModalEmailCount = withEmail.length;
+
+    const total = csvModalRows.length;
     const sub = document.getElementById('csvModalSub');
     sub.textContent = skipped
-      ? `Found ${csvModalRows.length} LinkedIn URL(s) — ${skipped} row(s) skipped (no valid LinkedIn URL).`
-      : `Found ${csvModalRows.length} LinkedIn URL(s). Uncheck any you don't want to include, then continue.`;
+      ? `Found ${total} LinkedIn URL(s) — ${skipped} row(s) skipped (no valid LinkedIn URL).`
+      : `Found ${total} LinkedIn URL(s). Uncheck any you don't want to include, then continue.`;
+
+    const rowHtml = (p, i) => `
+      <label class="csv-row">
+        <input type="checkbox" id="csvRow_${i}" checked onchange="updateCsvModalCount()">
+        <div>
+          <div class="csv-row-name">${esc(p.name)}</div>
+          <div class="csv-row-url">${esc(p.linkedin_url)}</div>
+          ${p.email ? `<div class="csv-row-email">${esc(p.email)}</div>` : ''}
+        </div>
+      </label>
+    `;
 
     const body = document.getElementById('csvModalBody');
-    if (!csvModalRows.length) {
+    if (!total) {
       body.innerHTML = '<div class="csv-empty">No leads to show.</div>';
     } else {
-      body.innerHTML = csvModalRows.map((p, i) => `
-        <label class="csv-row">
-          <input type="checkbox" id="csvRow_${i}" checked onchange="updateCsvModalCount()">
-          <div>
-            <div class="csv-row-name">${esc(p.name)}</div>
-            <div class="csv-row-url">${esc(p.linkedin_url)}</div>
-          </div>
-        </label>
-      `).join('');
+      let html = '';
+      if (withEmail.length) {
+        html += `<div class="csv-group-label select-group-title">Has Email <span class="badge">${withEmail.length}</span></div>`;
+        html += withEmail.map((p, i) => rowHtml(p, i)).join('');
+      }
+      if (withoutEmail.length) {
+        html += `<div class="csv-group-label select-group-title">No Email <span class="badge orange">${withoutEmail.length}</span></div>`;
+        html += withoutEmail.map((p, i) => rowHtml(p, csvModalEmailCount + i)).join('');
+      }
+      body.innerHTML = html;
     }
     updateCsvModalCount();
     document.getElementById('csvModal').classList.add('open');
@@ -1437,11 +1458,15 @@
   }
 
   function confirmCsvSelection() {
-    const checkedProfiles = [];
+    const checkedWithEmail = [];
+    const checkedWithoutEmail = [];
     document.querySelectorAll('#csvModalBody input[type="checkbox"]:checked').forEach(cb => {
       const i = parseInt(cb.id.replace('csvRow_', ''), 10);
-      if (csvModalRows[i]) checkedProfiles.push(csvModalRows[i]);
+      const p = csvModalRows[i];
+      if (!p) return;
+      (i < csvModalEmailCount ? checkedWithEmail : checkedWithoutEmail).push(p);
     });
+    const checkedProfiles = [...checkedWithEmail, ...checkedWithoutEmail];
 
     closeCsvModal();
     if (!checkedProfiles.length || !pendingCsvJobId) { pendingCsvJobId = null; return; }
@@ -1450,7 +1475,7 @@
     jobId = pendingCsvJobId;
     pendingCsvJobId = null;
 
-    selectionData = {with_email: [], without_email: checkedProfiles};
+    selectionData = {with_email: checkedWithEmail, without_email: checkedWithoutEmail};
     try { localStorage.setItem('leadIntelSelectionData', JSON.stringify(selectionData)); } catch(e) {}
     localStorage.setItem('leadIntelJobId', jobId);
     const q = document.getElementById('searchQuery').value.trim();

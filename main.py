@@ -2,6 +2,7 @@ import csv
 import io
 import json
 import os
+import re
 import threading
 import uuid
 from datetime import datetime, timedelta
@@ -10,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -894,6 +895,100 @@ async def select_profiles(job_id: str, request: Request, user: dict = Depends(ge
     thread.start()
 
     return {"status": "started", "selected_count": len(selected_urls)}
+
+
+def _stub_profile_from_url(url: str) -> dict:
+    """Build a minimal profile dict for a LinkedIn URL with no scraped data yet.
+
+    Mirrors the shape apify_client_wrapper._parse_profile produces so the
+    selection UI and Phase 2 pipeline can treat it the same as a searched profile.
+    """
+    slug = url
+    if "/in/" in url:
+        slug = url.rstrip("/").split("/in/")[-1].split("?")[0]
+    words = [w for w in re.split(r"[-_]+", slug) if w and not w.isdigit()]
+    name = " ".join(w.capitalize() for w in words) or "LinkedIn Profile"
+    return {
+        "first_name": "", "last_name": "", "name": name,
+        "headline": "", "job_title": "", "company": "", "company_url": "",
+        "about": "", "skills": "", "linkedin_url": url, "email": "",
+        "country": "", "city": "", "location_text": "",
+        "connections": 0, "followers": 0,
+        "is_hiring": False, "is_open_to_work": False, "is_premium": False,
+        "photo": "", "experience_summary": "", "education_summary": "", "certifications_summary": "",
+    }
+
+
+@app.post("/api/search/{job_id}/upload-csv")
+async def upload_leads_csv(job_id: str, file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    """Upload a CSV of LinkedIn URLs and add them to this job's selectable profiles.
+
+    Paid plans only. Auto-detects the URL column by header name (anything
+    containing "url", e.g. "URL", "LinkedIn URL", "Profile Url").
+    """
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job["phase"] not in ("awaiting_selection", "complete"):
+        raise HTTPException(status_code=400, detail=f"Cannot upload leads — job is in '{job['phase']}' phase")
+
+    plan = get_user_plan(user["email"])
+    if plan == "free":
+        raise HTTPException(status_code=403, detail="Uploading a leads list is available on paid plans. Please upgrade to use this feature.")
+
+    if not (file.filename or "").lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Please upload a .csv file")
+
+    raw = await file.read()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames:
+        raise HTTPException(status_code=400, detail="CSV appears to be empty")
+
+    url_column = None
+    for col in reader.fieldnames:
+        normalized = re.sub(r"[^a-z]", "", (col or "").lower())
+        if "url" in normalized:
+            url_column = col
+            break
+    if not url_column:
+        raise HTTPException(
+            status_code=400,
+            detail="Couldn't find a URL column in that CSV. Expected a header like 'URL', 'LinkedIn URL', or 'Profile URL'.",
+        )
+
+    existing_urls = {p["linkedin_url"] for p in job["profiles_with_email"] + job["profiles_without_email"]}
+    new_profiles = []
+    seen = set()
+    skipped = 0
+    for row in reader:
+        url = (row.get(url_column) or "").strip()
+        if not url:
+            continue
+        if "linkedin.com" not in url.lower():
+            skipped += 1
+            continue
+        if url in existing_urls or url in seen:
+            continue
+        seen.add(url)
+        new_profiles.append(_stub_profile_from_url(url))
+
+    if not new_profiles:
+        raise HTTPException(status_code=400, detail="No new LinkedIn profile URLs found in that CSV.")
+
+    job["profiles_without_email"].extend(new_profiles)
+
+    return {
+        "added": len(new_profiles),
+        "skipped": skipped,
+        "profiles": new_profiles,
+        "profiles_with_email": job["profiles_with_email"],
+        "profiles_without_email": job["profiles_without_email"],
+    }
 
 
 # ─── CSV Export ───────────────────────────────────────────────

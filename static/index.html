@@ -313,6 +313,26 @@
   .btn-history { background: rgba(79,106,246,0.18); border: 1px solid rgba(79,106,246,0.4); border-radius: 8px; padding: 5px 13px; font-size: 0.75rem; color: #a5b4fc; font-weight: 600; cursor: pointer; transition: all 0.15s; }
   .btn-history:hover { background: rgba(79,106,246,0.32); border-color: rgba(79,106,246,0.7); color: #c7d2fe; }
 
+  /* === CSV UPLOAD MODAL === */
+  .csv-modal { position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center; }
+  .csv-modal.open { display: flex; }
+  .csv-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); }
+  .csv-modal-inner { position: relative; width: 520px; max-width: 92vw; max-height: 82vh; background: #fff; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); display: flex; flex-direction: column; animation: ppSlideIn 0.22s ease-out; }
+  .csv-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 12px; border-bottom: 1px solid #e0e3ea; flex-shrink: 0; }
+  .csv-modal-title { font-size: 1rem; font-weight: 700; color: #1a1a2e; }
+  .csv-modal-sub { padding: 10px 20px 0; font-size: 0.78rem; color: #636e72; flex-shrink: 0; }
+  .csv-modal-body { flex: 1; overflow-y: auto; padding: 12px 20px; }
+  .csv-modal-footer { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-top: 1px solid #e0e3ea; flex-shrink: 0; }
+  .csv-modal-count { font-size: 0.78rem; color: #636e72; flex: 1; text-align: right; }
+  .csv-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer; }
+  .csv-row:hover { background: #f8f9fc; }
+  .csv-row input[type="checkbox"] { width: 16px; height: 16px; flex-shrink: 0; accent-color: #4f6af6; cursor: pointer; }
+  .csv-row-name { font-size: 0.85rem; font-weight: 600; color: #2d3436; }
+  .csv-row-url { font-size: 0.72rem; color: #b2bec3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .csv-empty { text-align: center; padding: 40px 20px; color: #b2bec3; font-size: 0.85rem; }
+  #uploadLeadsBtn.locked { opacity: 0.55; cursor: not-allowed; }
+  #uploadLeadsBtn.locked::after { content: ' 🔒'; }
+
   /* === POST PANEL === */
   .post-panel { position: fixed; inset: 0; z-index: 300; display: none; }
   .post-panel.open { display: block; }
@@ -586,6 +606,8 @@
         <button class="btn-secondary btn-sm" onclick="toggleSelectAll()">Select All</button>
         <button class="btn-secondary btn-sm" onclick="exportCSV('with-email')">Export With Email</button>
         <button class="btn-secondary btn-sm" onclick="exportCSV('without-email')">Export Without Email</button>
+        <button class="btn-secondary btn-sm" id="uploadLeadsBtn" onclick="triggerCsvUpload()" title="Upload a CSV of LinkedIn URLs to add to this list">&#128228; Upload Leads</button>
+        <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="onCsvFileSelected(event)">
       </div>
     </div>
 
@@ -680,6 +702,24 @@
       <button class="pp-tab" id="ppTabRecent" onclick="switchPPTab('recent')">Recent Posts (max :10)</button>
     </div>
     <div class="pp-body" id="ppBody"></div>
+  </div>
+</div>
+
+<!-- CSV UPLOAD PREVIEW MODAL -->
+<div class="csv-modal" id="csvModal">
+  <div class="csv-modal-backdrop" onclick="closeCsvModal()"></div>
+  <div class="csv-modal-inner">
+    <div class="csv-modal-header">
+      <div class="csv-modal-title">Uploaded Leads</div>
+      <button class="hp-close" onclick="closeCsvModal()">&times;</button>
+    </div>
+    <div class="csv-modal-sub" id="csvModalSub"></div>
+    <div class="csv-modal-body" id="csvModalBody"></div>
+    <div class="csv-modal-footer">
+      <button class="btn-secondary btn-sm" onclick="toggleCsvSelectAll()">Select All</button>
+      <span class="csv-modal-count" id="csvModalCount">0 selected</span>
+      <button class="btn-primary" id="csvModalConfirmBtn" onclick="confirmCsvSelection()">Add Selected to List</button>
+    </div>
   </div>
 </div>
 
@@ -1059,6 +1099,8 @@
   let animationCounter = 0; // Track animation progress separately
   let currentJobPhase = ''; // Track current job state
   let selectionData = {with_email: [], without_email: []}; // populated at awaiting_selection
+  let currentPlan = null; // set by loadUsage(); gates paid-only features like CSV upload
+  let csvModalRows = []; // [{url, name}] parsed from the last CSV upload, pending confirmation
 
   // ─── PIPELINE STEP NAVIGATION ────────────────────────────
   function onStepClick(step) {
@@ -1299,6 +1341,130 @@
     const allChecked = Array.from(boxes).every(b => b.checked);
     boxes.forEach(b => b.checked = !allChecked);
     updateSelectedCount();
+  }
+
+  // ─── CSV LEAD UPLOAD ──────────────────────────────────────
+  function applyUploadLeadsGate() {
+    const btn = document.getElementById('uploadLeadsBtn');
+    if (!btn) return;
+    if (currentPlan === 'free') {
+      btn.classList.add('locked');
+      btn.title = 'Upgrade your plan to upload a leads list';
+    } else {
+      btn.classList.remove('locked');
+      btn.title = 'Upload a CSV of LinkedIn URLs to add to this list';
+    }
+  }
+
+  function triggerCsvUpload() {
+    if (currentPlan === 'free') {
+      showError('Uploading a leads list is available on paid plans. Please upgrade to use this feature.');
+      return;
+    }
+    if (!jobId) {
+      showError('Start a search first, then upload leads to add to that list.');
+      return;
+    }
+    document.getElementById('csvFileInput').value = '';
+    document.getElementById('csvFileInput').click();
+  }
+
+  async function onCsvFileSelected(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const btn = document.getElementById('uploadLeadsBtn');
+    const origText = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Uploading...';
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await authFetch(`/api/search/${jobId}/upload-csv`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (handleAuthError(res)) return;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to upload CSV');
+
+      // Keep selectionData's without-email list in sync with the server
+      selectionData.with_email = data.profiles_with_email || selectionData.with_email;
+      selectionData.without_email = data.profiles_without_email || selectionData.without_email;
+      try { localStorage.setItem('leadIntelSelectionData', JSON.stringify(selectionData)); } catch(e) {}
+
+      openCsvModal(data.profiles, data.skipped);
+    } catch (e) {
+      showError(e.message || 'Failed to upload CSV.');
+    } finally {
+      btn.disabled = false; btn.textContent = origText;
+    }
+  }
+
+  function openCsvModal(profiles, skipped) {
+    csvModalRows = profiles || [];
+    const sub = document.getElementById('csvModalSub');
+    sub.textContent = skipped
+      ? `Found ${csvModalRows.length} LinkedIn URL(s) — ${skipped} row(s) skipped (no valid LinkedIn URL).`
+      : `Found ${csvModalRows.length} LinkedIn URL(s). Uncheck any you don't want to add.`;
+
+    const body = document.getElementById('csvModalBody');
+    if (!csvModalRows.length) {
+      body.innerHTML = '<div class="csv-empty">No leads to show.</div>';
+    } else {
+      body.innerHTML = csvModalRows.map((p, i) => `
+        <label class="csv-row">
+          <input type="checkbox" id="csvRow_${i}" checked onchange="updateCsvModalCount()">
+          <div>
+            <div class="csv-row-name">${esc(p.name)}</div>
+            <div class="csv-row-url">${esc(p.linkedin_url)}</div>
+          </div>
+        </label>
+      `).join('');
+    }
+    updateCsvModalCount();
+    document.getElementById('csvModal').classList.add('open');
+  }
+
+  function closeCsvModal() {
+    document.getElementById('csvModal').classList.remove('open');
+  }
+
+  function updateCsvModalCount() {
+    const checked = document.querySelectorAll('#csvModalBody input[type="checkbox"]:checked').length;
+    document.getElementById('csvModalCount').textContent = `${checked} selected`;
+  }
+
+  function toggleCsvSelectAll() {
+    const boxes = document.querySelectorAll('#csvModalBody input[type="checkbox"]');
+    const allChecked = Array.from(boxes).every(b => b.checked);
+    boxes.forEach(b => b.checked = !allChecked);
+    updateCsvModalCount();
+  }
+
+  function confirmCsvSelection() {
+    const checkedUrls = new Set();
+    document.querySelectorAll('#csvModalBody input[type="checkbox"]:checked').forEach((cb, idx) => {
+      const i = parseInt(cb.id.replace('csvRow_', ''), 10);
+      if (csvModalRows[i]) checkedUrls.add(csvModalRows[i].linkedin_url);
+    });
+
+    closeCsvModal();
+
+    if (!checkedUrls.size) return;
+
+    // Re-render the main selection list (it already has all uploaded profiles
+    // from the server response) and check the ones confirmed in the modal.
+    renderSelection(selectionData.with_email, selectionData.without_email);
+    checkedUrls.forEach(url => {
+      const box = document.querySelector(`#selectionSection input[data-url="${CSS.escape(url)}"]`);
+      if (box) box.checked = true;
+    });
+    updateSelectedCount();
+
+    document.getElementById('selectionSection').classList.add('visible');
+    document.getElementById('floatingDeepSearch').classList.add('visible');
+    document.getElementById('selectionSection').scrollIntoView({behavior: 'smooth', block: 'start'});
   }
 
   async function startPostScraping() {
@@ -2101,6 +2267,8 @@
       const res = await authFetch('/api/usage');
       if (!res.ok) return;
       const data = await res.json();
+      currentPlan = data.plan;
+      applyUploadLeadsGate();
       const el = document.getElementById('usageBadge');
       if (!el) return;
       if (data.trial_expired) {

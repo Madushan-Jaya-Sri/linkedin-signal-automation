@@ -939,11 +939,16 @@ def _extract_leads_from_csv(csv_text: str) -> tuple[list[dict], int]:
         raise HTTPException(status_code=400, detail="CSV appears to be empty")
 
     url_column = None
+    fallback_column = None
     for col in reader.fieldnames:
         normalized = re.sub(r"[^a-z]", "", (col or "").lower())
-        if "url" in normalized:
+        if "linkedin" in normalized and "url" in normalized:
             url_column = col
             break
+        if "url" in normalized and fallback_column is None:
+            fallback_column = col
+    if not url_column:
+        url_column = fallback_column
     if not url_column:
         raise HTTPException(
             status_code=400,
